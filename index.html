@@ -3,448 +3,240 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expressive Dark Chat</title>
-    <!-- Load Tailwind CSS CDN -->
+    <title>Real-Time Chat (Supabase)</title>
+    <!-- Tailwind CSS CDN (For development/single-file environments) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Lucide Icons CDN -->
-    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* Deep Dark Mode Theme - Mimicking M3 Expressive */
-        :root {
-            --color-primary: #D0BCFF; /* M3 Primary */
-            --color-on-surface: #E6E1E5; /* M3 On Surface */
-            --color-surface-container: #211F26; /* M3 Surface Container (Deep Dark) */
-            --color-surface-container-low: #1C1B20; /* M3 Background */
-        }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--color-surface-container-low);
-            color: var(--color-on-surface);
-            transition: background-color 0.3s, color 0.3s;
-        }
-        /* Custom scrollbar for chat window */
-        #message-list {
-            scrollbar-width: thin;
-            scrollbar-color: #555 #1C1B20;
-        }
-        #message-list::-webkit-scrollbar {
-            width: 8px;
-        }
-        #message-list::-webkit-scrollbar-track {
-            background: #1C1B20;
-        }
-        #message-list::-webkit-scrollbar-thumb {
-            background-color: #555;
-            border-radius: 20px;
-            border: 2px solid #1C1B20;
-        }
-        /* Custom focused input style */
-        .custom-input:focus {
-            border-color: var(--color-primary);
-            box-shadow: 0 0 0 2px rgba(208, 188, 255, 0.5); /* Primary tint shadow */
-        }
-        /* Style for the Primary Button */
-        .primary-button {
-            background-color: var(--color-primary);
-            color: #1C1B20; /* Color on Primary */
-            transition: transform 0.1s, box-shadow 0.2s;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
-        }
-        .primary-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.6);
+        /* Custom styles for chat scroll and input */
+        #chat-container {
+            height: calc(100vh - 16rem); /* Adjust height for full view */
+            overflow-y: auto;
+            scroll-behavior: smooth;
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col antialiased">
+<!-- DARK MODE: Body background and text color -->
+<body class="bg-gray-900 flex flex-col h-screen antialiased text-gray-100">
 
-    <!-- Main Application Container -->
-    <div id="app" class="flex flex-col flex-grow w-full max-w-7xl mx-auto p-4 md:p-8">
-        <!-- Content will be injected here: Auth or Chat -->
+    <div class="flex flex-col flex-auto h-full p-6">
+        <!-- Main container background -->
+        <div class="flex flex-col flex-auto flex-shrink-0 rounded-2xl bg-gray-800 p-4 shadow-xl h-full">
+            <!-- Title text and border color -->
+            <h1 class="text-2xl font-bold text-teal-400 mb-4 border-b border-gray-700 pb-2">Public Chat Room (Supabase)</h1>
+
+            <div class="flex flex-col h-full overflow-hidden">
+                <!-- User Status Header -->
+                <!-- Status bar colors -->
+                <div id="user-status" class="flex justify-between items-center text-sm font-medium text-gray-400 mb-4 p-2 bg-teal-900/30 rounded-lg">
+                    <span>Status: <span id="auth-status" class="text-red-400">Connecting...</span></span>
+                    <span id="current-user-id" class="truncate max-w-[200px] md:max-w-full"></span>
+                </div>
+
+                <!-- Chat Messages Container -->
+                <!-- Chat container background -->
+                <div id="chat-container" class="flex flex-col h-full mb-4 space-y-4 p-4 bg-gray-900 rounded-xl">
+                    <div id="message-list" class="flex flex-col space-y-4">
+                        <!-- Messages will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Message Input -->
+                <div class="flex flex-row items-center border-t border-gray-700 pt-4">
+                    <div class="flex-grow ml-4">
+                        <div class="relative w-full">
+                            <!-- Input field background and border color -->
+                            <input type="text" id="message-input" placeholder="Type your message..."
+                                class="flex w-full border border-gray-700 bg-gray-700 text-gray-100 rounded-xl focus:outline-none focus:border-teal-500 pl-4 h-12 transition duration-200"
+                                onkeypress="if(event.keyCode === 13) sendMessage()" />
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <button id="send-button" onclick="sendMessage()"
+                            class="flex items-center justify-center bg-teal-600 hover:bg-teal-500 rounded-xl text-white px-4 py-3 flex-shrink-0 transition duration-300 shadow-md disabled:opacity-50"
+                            disabled>
+                            <span class="font-semibold">Send</span>
+                            <svg class="ml-2 w-4 h-4 transform rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Firebase SDK Imports -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, orderBy, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // --- Supabase Client Import ---
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.0/+esm'
 
-        // IMPORTANT: Global variables are provided by the Canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // --- Supabase Configuration (***REPLACE THESE WITH YOUR ACTUAL KEYS***) ---
+        // NOTE: In a real environment, these would be loaded securely from environment variables.
+        const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; // e.g., 'https://abcde12345.supabase.co'
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4'; // e.g., 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
 
-        // Initialize Firebase
-        let app;
-        let db;
-        let auth;
-        let userId = null;
-        let username = null;
-        let isAuthReady = false;
+        const MESSAGES_TABLE_NAME = 'messages'; // Ensure you have a table named 'messages' in Supabase
 
-        const appDiv = document.getElementById('app');
+        let supabaseClient;
+        let userId;
 
-        // Utility function for exponential backoff retry logic
-        const fetchWithRetry = async (fn, maxRetries = 5) => {
-            let attempt = 0;
-            while (attempt < maxRetries) {
-                try {
-                    return await fn();
-                } catch (error) {
-                    if (attempt === maxRetries - 1) throw error;
-                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
-                    console.warn(`Retry attempt ${attempt + 1}/${maxRetries}. Delaying for ${delay}ms. Error:`, error.message);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    attempt++;
-                }
-            }
-        };
+        const chatContainer = document.getElementById('chat-container');
+        const messageList = document.getElementById('message-list');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const authStatus = document.getElementById('auth-status');
+        const currentUserIdElement = document.getElementById('current-user-id');
 
-
-        // --- FIREBASE INITIALIZATION & AUTHENTICATION ---
-
-        try {
-            // Set log level to debug for better visibility of Firestore operations
-            setLogLevel('Debug');
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-
-            // Handle initial authentication state
-            const setupAuth = async () => {
-                try {
-                    if (initialAuthToken) {
-                        await fetchWithRetry(() => signInWithCustomToken(auth, initialAuthToken));
-                    } else {
-                        await fetchWithRetry(() => signInAnonymously(auth));
-                    }
-                } catch (e) {
-                    console.error("Initial sign-in failed:", e);
-                    // Fallback to anonymous sign-in if token fails
-                    try {
-                         await fetchWithRetry(() => signInAnonymously(auth));
-                    } catch (err) {
-                        console.error("Anonymous sign-in failed:", err);
-                    }
-                }
-            };
-
-            setupAuth();
-
-            // Auth State Listener
-            onAuthStateChanged(auth, async (user) => {
-                isAuthReady = true;
-                if (user) {
-                    userId = user.uid;
-                    await checkAndFetchUserProfile(user.uid);
-                } else {
-                    userId = null;
-                    username = null;
-                }
-                // The listener is the single source of truth for calling renderApp
-                renderApp(); 
-            });
-
-            // FIX: Add a timeout to force an initial render if the auth listener is delayed, 
-            // preventing the app from getting stuck on the loading screen.
-            setTimeout(() => {
-                if (!isAuthReady) {
-                    console.warn("Auth Listener delayed, forcing initial render to Auth Screen.");
-                    isAuthReady = true;
-                    renderApp();
-                }
-            }, 3000); // 3 second delay
-
-        } catch (error) {
-            console.error("Firebase Initialization Error:", error);
-            appDiv.innerHTML = '<div class="text-red-400 p-8 text-center">Failed to initialize Firebase. Check console for details.</div>';
+        // Function to scroll chat to the bottom
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        // --- USER PROFILE MANAGEMENT ---
+        // --- Supabase Initialization and Identity ---
+        async function initializeSupabase() {
+            console.log("Initializing Supabase...");
 
-        const getProfileDocRef = (uid) => doc(db, `artifacts/${appId}/users/${uid}/profile/metadata`);
-
-        // Fetch or create user profile
-        const checkAndFetchUserProfile = async (uid) => {
-            const profileRef = getProfileDocRef(uid);
-            const profileSnap = await fetchWithRetry(() => getDoc(profileRef));
-
-            if (profileSnap.exists()) {
-                username = profileSnap.data().username;
-            } else if (auth.currentUser.isAnonymous) {
-                // Anonymous users get a generic temporary username
-                username = `Guest-${uid.substring(0, 4)}`;
-                // No need to save anonymous profile unless they send a message
-            } else {
-                // Logged in users MUST have a username, which should have been set during signup
-                // If it's missing (e.g., first login after anonymous), render the auth screen again.
-                // For this example, we'll assume a successful signup has set it.
-                // If the user signed up using email/pass, their username is already stored/used.
-                // If this is reached, it means a real user is missing a username, which is an error state.
-                username = 'User-Error';
-            }
-        };
-
-        const saveUserProfile = async (uid, uname) => {
-            const profileRef = getProfileDocRef(uid);
-            await fetchWithRetry(() => setDoc(profileRef, { username: uname, createdAt: serverTimestamp() }, { merge: true }));
-            username = uname;
-        };
-
-
-        // --- MESSAGE LOGIC ---
-
-        const collectionPath = `artifacts/${appId}/public/data/messages`;
-        const getMessagesCollectionRef = () => collection(db, collectionPath);
-
-        const sendMessage = async (messageText) => {
-            if (!userId || !username || !messageText.trim()) return;
-
-            // Ensure profile is saved if it's the first message from an anonymous user
-            if (auth.currentUser.isAnonymous && username.startsWith('Guest-')) {
-                 await saveUserProfile(userId, username);
+            if (SUPABASE_URL.includes('your-project-ref') || SUPABASE_ANON_KEY.includes('YOUR_ANON_PUBLIC_KEY')) {
+                authStatus.textContent = 'ERROR: Keys Missing';
+                authStatus.classList.replace('text-red-400', 'text-red-700');
+                console.error("Supabase keys are missing. Please replace placeholders with actual project URL and Anon key.");
+                return;
             }
 
             try {
-                await fetchWithRetry(() => addDoc(getMessagesCollectionRef(), {
-                    text: messageText,
-                    senderId: userId,
-                    username: username,
-                    timestamp: serverTimestamp()
-                }));
-                document.getElementById('message-input').value = '';
-                scrollToBottom();
+                // Initialize client
+                supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                // Simulate authentication: use a random UUID as the senderId for this session
+                userId = crypto.randomUUID();
+                
+                authStatus.textContent = 'Connected (Anon)';
+                authStatus.classList.replace('text-red-400', 'text-green-400');
+                currentUserIdElement.textContent = `User ID: ${userId}`;
+                sendButton.disabled = false;
+                console.log(`Supabase initialized. Session User ID: ${userId}`);
+                
+                startMessageListener();
+
             } catch (error) {
-                console.error("Error sending message: ", error);
+                console.error("Supabase Initialization Error:", error);
+                authStatus.textContent = `Init Error: ${error.message}`;
+                authStatus.classList.replace('text-red-400', 'text-red-700');
             }
-        };
+        }
 
-        const subscribeToMessages = () => {
-            if (!isAuthReady || !userId) return () => {};
+        // --- Supabase Realtime and Data Fetching ---
 
-            // NOTE: orderBy is kept but may require Firestore index setup in a real environment
-            const messagesQuery = query(getMessagesCollectionRef(), orderBy('timestamp', 'asc')); 
+        async function fetchInitialMessages() {
+             const { data, error } = await supabaseClient
+                .from(MESSAGES_TABLE_NAME)
+                .select('*')
+                .order('created_at', { ascending: true }); // Use 'created_at' which is the standard Supabase timestamp column
 
-            return onSnapshot(messagesQuery, (snapshot) => {
-                const messages = [];
-                snapshot.forEach(doc => {
-                    messages.push({ id: doc.id, ...doc.data() });
+            if (error) {
+                console.error("Error fetching initial messages:", error);
+                return [];
+            }
+            return data;
+        }
+
+        async function startMessageListener() {
+            console.log(`Starting listener on table: ${MESSAGES_TABLE_NAME}`);
+            
+            // 1. Fetch initial messages
+            const initialMessages = await fetchInitialMessages();
+            renderMessages(initialMessages);
+
+            // 2. Set up Realtime subscription
+            supabaseClient
+                .channel('public-chat')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
+                    console.log('Realtime message received:', payload);
+                    
+                    // We re-fetch all messages to keep the display consistent and handle potential missing records,
+                    // but for performance, a production app would often just append the `payload.new` message.
+                    fetchInitialMessages().then(renderMessages);
+                })
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        console.log('Supabase Realtime subscription active.');
+                    } else if (status === 'CHANNEL_ERROR') {
+                        console.error('Supabase Realtime Channel Error.');
+                    }
                 });
-                renderMessageList(messages);
-            }, (error) => {
-                console.error("Error subscribing to messages: ", error);
-            });
-        };
+        }
 
+        window.sendMessage = async function() {
+            const text = messageInput.value.trim();
+            if (text === "" || !userId || !supabaseClient) return;
 
-        // --- UI RENDERING FUNCTIONS ---
+            sendButton.disabled = true;
 
-        const scrollToBottom = () => {
-            const list = document.getElementById('message-list');
-            if (list) {
-                list.scrollTop = list.scrollHeight;
+            const message = {
+                text: text,
+                senderId: userId,
+                // Supabase automatically handles 'created_at' and 'id' if configured
+            };
+
+            try {
+                // Insert the new message into the table
+                const { error } = await supabaseClient
+                    .from(MESSAGES_TABLE_NAME)
+                    .insert([message]);
+
+                if (error) {
+                    throw new Error(error.message);
+                }
+                
+                messageInput.value = '';
+                // The Realtime listener will handle the UI update
+
+            } catch (error) {
+                console.error("Error sending message:", error);
+                console.error(`Failed to send message: ${error.message}`); 
+            } finally {
+                sendButton.disabled = false;
+                messageInput.focus();
             }
-        };
+        }
 
-        const renderMessageList = (messages) => {
-            const list = document.getElementById('message-list');
-            if (!list) return;
+        // --- UI Rendering ---
 
-            const shouldScroll = list.scrollTop + list.clientHeight >= list.scrollHeight - 50; // Check if near bottom
+        function renderMessages(messages) {
+            messageList.innerHTML = ''; // Clear existing messages
+            const fragment = document.createDocumentFragment();
 
-            list.innerHTML = messages.map(msg => {
-                const isUser = msg.senderId === userId;
-                // Determine color palette based on sender for M3 Expressive card style
-                const bgColor = isUser ? 'bg-[#494553]' : 'bg-[#292730]'; // Secondary Container vs Surface Container
-                const alignment = isUser ? 'self-end' : 'self-start';
-                const time = msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
+            messages.forEach(msg => {
+                const isMe = msg.senderId === userId;
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('flex', isMe ? 'justify-end' : 'justify-start');
 
-                return `
-                    <div class="flex flex-col w-full max-w-xs md:max-w-md ${alignment} mb-3">
-                        <span class="text-xs font-semibold ${isUser ? 'text-right' : 'text-left'} text-gray-400 mb-1">${msg.username || '...'}</span>
-                        <div class="${bgColor} ${isUser ? 'rounded-tl-2xl' : 'rounded-tr-2xl'} rounded-b-2xl p-3 shadow-lg transform transition duration-300 hover:scale-[1.01]">
-                            <p class="text-sm break-words">${msg.text}</p>
-                            <span class="text-xs text-gray-400 mt-1 block ${isUser ? 'text-right' : 'text-left'}">${time}</span>
+                // Supabase uses 'created_at' (ISO string)
+                const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
+
+                messageElement.innerHTML = `
+                    <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-xs md:max-w-md">
+                        <!-- Sender text color -->
+                        <div class="text-xs ${isMe ? 'text-gray-400 mr-2' : 'text-teal-400 ml-2'} font-semibold truncate max-w-[150px] md:max-w-[200px]" title="${msg.senderId}">
+                            ${isMe ? 'You' : msg.senderId.substring(0, 10) + '...'}
+                        </div>
+                        <!-- Message bubble colors -->
+                        <div class="relative ${isMe ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-100 border border-gray-600'} rounded-xl p-4 shadow-md mt-1">
+                            <div>${msg.text}</div>
+                            <!-- Timestamp border color -->
+                            <div class="text-xs mt-1 pt-1 border-t ${isMe ? 'border-teal-400' : 'border-gray-500'} text-right opacity-75">${time}</div>
                         </div>
                     </div>
                 `;
-            }).join('');
-
-            if (shouldScroll) {
-                setTimeout(scrollToBottom, 50); // Ensure scroll after DOM update
-            }
-        };
-
-        // Renders the main chat application interface
-        const renderChatScreen = () => {
-            appDiv.innerHTML = `
-                <!-- Chat Screen Header -->
-                <header class="flex justify-between items-center p-4 rounded-3xl mb-4 bg-surface-container shadow-xl">
-                    <h1 class="text-2xl font-extrabold text-white">Expressive Chat</h1>
-                    <div class="flex items-center space-x-4">
-                         <span class="text-sm text-gray-400 hidden sm:block">User ID: <span class="font-mono text-xs text-primary">${userId}</span></span>
-                         <span class="text-lg font-bold text-primary mr-2">${username}</span>
-                        <button id="signout-button" class="p-2 rounded-full hover:bg-[#3E3847] transition">
-                            <i data-lucide="log-out" class="w-5 h-5 text-red-400"></i>
-                        </button>
-                    </div>
-                </header>
-
-                <!-- Chat Area -->
-                <div class="flex-grow flex flex-col bg-surface-container rounded-3xl shadow-2xl p-4 overflow-hidden">
-                    <!-- Message List -->
-                    <div id="message-list" class="flex-grow overflow-y-auto space-y-2 pb-4">
-                        <div class="text-center text-gray-500 p-8">Loading messages...</div>
-                    </div>
-
-                    <!-- Input Form -->
-                    <form id="message-form" class="flex items-center pt-4 border-t border-gray-700">
-                        <input type="text" id="message-input" placeholder="Type your message..."
-                               class="custom-input flex-grow p-3 mr-4 rounded-xl text-lg bg-[#292730] border border-gray-600 focus:outline-none">
-                        <button type="submit" class="primary-button flex items-center justify-center p-3 rounded-xl shadow-lg">
-                            <i data-lucide="send" class="w-6 h-6"></i>
-                            <span class="ml-2 font-semibold hidden sm:inline">Send</span>
-                        </button>
-                    </form>
-                </div>
-            `;
-
-            // Attach event listeners
-            document.getElementById('signout-button').addEventListener('click', () => signOut(auth));
-            document.getElementById('message-form').addEventListener('submit', (e) => {
-                e.preventDefault();
-                sendMessage(document.getElementById('message-input').value);
+                fragment.appendChild(messageElement);
             });
 
-            // Start real-time subscription
-            const unsubscribe = subscribeToMessages();
-            // Cleanup function will be useful if we had multiple views
-            return unsubscribe;
-        };
+            messageList.appendChild(fragment);
+            scrollToBottom();
+        }
 
-        // Renders the full-screen authentication interface
-        const renderAuthScreen = (mode = 'login', errorMessage = '') => {
-            appDiv.innerHTML = `
-                <div class="flex flex-col items-center justify-center flex-grow">
-                    <!-- M3 Expressive Card -->
-                    <div class="w-full max-w-sm p-8 bg-surface-container rounded-[28px] shadow-2xl transition duration-500 ease-in-out">
-                        <h2 class="text-3xl font-bold text-white text-center mb-6">
-                            ${mode === 'login' ? 'Welcome Back' : 'Create Account'}
-                        </h2>
+        // Start the application setup
+        window.onload = initializeSupabase;
 
-                        <!-- Error Message -->
-                        ${errorMessage ? `<p class="text-red-400 bg-red-900/30 p-3 rounded-xl mb-4 text-center">${errorMessage}</p>` : ''}
-
-                        <form id="auth-form" class="space-y-4">
-                            <!-- Username Input (For Signup) -->
-                            ${mode === 'signup' ? `
-                                <input type="text" id="auth-username" placeholder="Username (Display Name)" required
-                                       class="custom-input w-full p-3 rounded-xl text-lg bg-[#292730] border border-gray-600 focus:outline-none">
-                            ` : ''}
-
-                            <!-- Email Input -->
-                            <input type="email" id="auth-email" placeholder="Email Address" required
-                                   class="custom-input w-full p-3 rounded-xl text-lg bg-[#292730] border border-gray-600 focus:outline-none">
-
-                            <!-- Password Input (Secret Key) -->
-                            <input type="password" id="auth-password" placeholder="Secret Key (Password)" required
-                                   class="custom-input w-full p-3 rounded-xl text-lg bg-[#292730] border border-gray-600 focus:outline-none">
-
-                            <!-- Submit Button -->
-                            <button type="submit" class="primary-button w-full py-3 mt-6 text-lg font-bold rounded-xl uppercase tracking-wider">
-                                ${mode === 'login' ? 'Login' : 'Sign Up'}
-                            </button>
-                        </form>
-
-                        <!-- Toggle Link -->
-                        <p class="mt-6 text-center text-gray-400">
-                            ${mode === 'login' ? "Don't have an account?" : "Already have an account?"}
-                            <button id="toggle-auth-mode" class="text-primary font-semibold hover:text-white transition">
-                                ${mode === 'login' ? 'Sign Up' : 'Login'}
-                            </button>
-                        </p>
-                    </div>
-                </div>
-            `;
-
-            let currentMode = mode;
-            let currentError = '';
-
-            const authForm = document.getElementById('auth-form');
-            const toggleButton = document.getElementById('toggle-auth-mode');
-
-            toggleButton.addEventListener('click', () => {
-                renderAuthScreen(currentMode === 'login' ? 'signup' : 'login');
-            });
-
-            authForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                currentError = '';
-                const email = document.getElementById('auth-email').value;
-                const password = document.getElementById('auth-password').value;
-                const usernameInput = document.getElementById('auth-username')?.value;
-
-                try {
-                    if (currentMode === 'signup') {
-                        if (!usernameInput) {
-                            currentError = 'Username is required for sign up.';
-                            renderAuthScreen(currentMode, currentError);
-                            return;
-                        }
-                        const userCredential = await fetchWithRetry(() => createUserWithEmailAndPassword(auth, email, password));
-                        // Save username immediately after successful creation
-                        await saveUserProfile(userCredential.user.uid, usernameInput);
-                    } else { // login
-                        await fetchWithRetry(() => signInWithEmailAndPassword(auth, email, password));
-                    }
-                    // onAuthStateChanged will handle the rest
-                } catch (error) {
-                    let friendlyMessage = 'An unknown error occurred.';
-                    if (error.code) {
-                        switch (error.code) {
-                            case 'auth/email-already-in-use': friendlyMessage = 'This email is already registered. Try logging in.'; break;
-                            case 'auth/invalid-email': friendlyMessage = 'The email address is not valid.'; break;
-                            case 'auth/weak-password': friendlyMessage = 'The secret key is too weak (min 6 characters).'; break;
-                            case 'auth/user-not-found':
-                            case 'auth/wrong-password': friendlyMessage = 'Invalid credentials. Please check your email and secret key.'; break;
-                            default: friendlyMessage = error.message;
-                        }
-                    }
-                    console.error("Auth Error:", error);
-                    renderAuthScreen(currentMode, friendlyMessage);
-                }
-            });
-
-            // Re-run lucide replacement for icons
-            lucide.createIcons();
-        };
-
-        // --- MAIN RENDER LOOP ---
-
-        let currentUnsubscribe = null;
-
-        const renderApp = () => {
-            // Cleanup previous subscription if it exists
-            if (currentUnsubscribe) {
-                currentUnsubscribe();
-                currentUnsubscribe = null;
-            }
-
-            if (!isAuthReady) {
-                appDiv.innerHTML = '<div class="text-center p-10 text-xl text-gray-500">Initializing Authentication...</div>';
-            } else if (userId && username) {
-                // User is logged in and has a profile
-                currentUnsubscribe = renderChatScreen();
-            } else {
-                // User is not logged in or profile is missing (anonymous sign-in is not considered logged in here)
-                renderAuthScreen('login');
-            }
-            // Re-run lucide replacement for icons in the newly rendered view
-            lucide.createIcons();
-        };
-
-        // Initial render call (will be refined by onAuthStateChanged)
-        renderApp();
     </script>
 </body>
 </html>
