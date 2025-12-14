@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Thing IDK - Supabase Chat</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        /* Custom scrollbar for chat-box */
+        #chat-box::-webkit-scrollbar { width: 8px; }
+        #chat-box::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 4px; }
+        #chat-box::-webkit-scrollbar-track { background-color: #1f2937; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col antialiased">
+
+    <!-- Main Application Container (increased roundness) -->
+    <div id="app" class="flex flex-col flex-grow w-full max-w-4xl mx-auto shadow-2xl rounded-3xl overflow-hidden my-4 sm:my-8 bg-gray-800">
+        
+        <!-- Header -->
+        <header class="p-4 sm:p-6 text-center text-xl font-bold border-b border-gray-700 flex justify-between items-center">
+            <!-- Now shows Secret ID and Simulated Role -->
+            <span class="text-gray-400 text-sm font-medium hidden sm:block" id="user-info">Loading...</span>
+            <!-- Title now has an ID to dynamically update the user's name/alias -->
+            <h1 class="text-white text-2xl" id="main-title">Chat Thing IDK</h1>
+            
+            <div class="flex items-center space-x-3">
+                <button id="role-switch-button" class="p-2 rounded-full transition duration-150 text-gray-400 hover:text-white hover:bg-gray-700" title="Switch User Role / Theme">
+                    <!-- Icon for User/Switching (Lucide/Heroicons equivalent) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M16 11l-4 4-4-4"/>
+                    </svg>
+                </button>
+                <span class="text-xs px-3 py-1 rounded-full text-white font-semibold" id="theme-indicator"></span>
+            </div>
+        </header>
+
+        <!-- Chat Messages Area -->
+        <main id="chat-box" class="flex-grow p-4 sm:p-6 overflow-y-auto space-y-4 max-h-[70vh] min-h-[50vh] scroll-smooth">
+            <div id="loading-indicator" class="text-center text-gray-500">Connecting to Supabase...</div>
+        </main>
+
+        <!-- Message Input Form (Distinct background for visual separation) -->
+        <div class="p-4 sm:p-6 bg-gray-700">
+            <form id="message-form" class="flex space-x-3">
+                <input
+                    type="text"
+                    id="message-input"
+                    placeholder="Type your message..."
+                    class="flex-grow p-3 text-sm bg-gray-600 text-white border-none rounded-full focus:ring-4 focus:ring-opacity-50 transition duration-150 shadow-inner disabled:opacity-50"
+                    autocomplete="off"
+                    required
+                    disabled
+                >
+                <button
+                    type="submit"
+                    id="send-button"
+                    class="px-6 py-3 text-sm font-semibold rounded-full text-white transition duration-150 shadow-md hover:shadow-lg disabled:opacity-50"
+                    disabled
+                >
+                    Send
+                </button>
+            </form>
+            <div id="error-message" class="mt-2 text-red-400 text-xs hidden"></div>
+        </div>
+    </div>
+
+    <!-- Role Selector Modal -->
+    <div id="role-selector-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 class="text-2xl font-bold text-white mb-6 border-b border-gray-700 pb-3">Simulate User Role</h2>
+            <p class="text-sm text-gray-400 mb-6">Select a known ID to test its custom theme, or enter a custom ID to use the default theme. This ID will be used as the `sender_secret_id` in the database.</p>
+            
+            <form id="role-selector-form" class="space-y-4">
+                
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-300">Predefined Users (Secret IDs from DB):</label>
+                    <div class="flex flex-col space-y-2">
+                        <!-- Corvexis Role -->
+                        <label class="inline-flex items-center p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition">
+                            <input type="radio" name="simulated_id" value="KEY_CORVEXIS_ALPHA" class="form-radio h-4 w-4 text-blue-500 border-gray-600 focus:ring-blue-500">
+                            <span class="ml-3 text-white font-medium">Corvexis</span>
+                            <span class="ml-auto text-xs text-blue-400">(KEY_CORVEXIS_ALPHA)</span>
+                        </label>
+                        <!-- Sylvexis Role -->
+                        <label class="inline-flex items-center p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition">
+                            <input type="radio" name="simulated_id" value="KEY_SYLVEXIS_BETA" class="form-radio h-4 w-4 text-fuchsia-500 border-gray-600 focus:ring-fuchsia-500">
+                            <span class="ml-3 text-white font-medium">Sylvexis</span>
+                            <span class="ml-auto text-xs text-fuchsia-400">(KEY_SYLVEXIS_BETA)</span>
+                        </label>
+                         <!-- TestUser Role -->
+                        <label class="inline-flex items-center p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition">
+                            <input type="radio" name="simulated_id" value="GuestTester789" class="form-radio h-4 w-4 text-green-500 border-gray-600 focus:ring-green-500">
+                            <span class="ml-3 text-white font-medium">TestUser</span>
+                            <span class="ml-auto text-xs text-green-400">(GuestTester789)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Custom ID Input -->
+                <div>
+                    <label for="custom_id" class="block text-sm font-medium text-gray-300 mb-1">Or enter a custom User ID:</label>
+                    <input
+                        type="text"
+                        id="custom_id"
+                        name="custom_id"
+                        placeholder="Enter any ID for testing"
+                        class="w-full p-3 text-sm bg-gray-700 text-white border border-gray-600 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition"
+                        oninput="document.querySelectorAll('input[name=simulated_id]').forEach(r => r.checked = false);"
+                    >
+                </div>
+
+                <div class="flex justify-end pt-2 space-x-3">
+                    <button type="button" id="cancel-role-switch" class="px-5 py-2 text-sm font-medium rounded-lg text-gray-300 hover:bg-gray-700 transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2 text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition">
+                        Apply Role
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- Supabase Script -->
+    <script type="module">
+        // Import Supabase client
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+        // --- SUPABASE CONFIGURATION (MUST BE UPDATED BY USER) ---
+        // NOTE: Replace these with your actual Supabase project URL and anon key.
+        const SUPABASE_URL = 'YOUR_SUPABASE_PROJECT_URL'; 
+        const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        
+        /* * IMPORTANT RLS NOTE:
+         * This app uses the 'anon' key for the Supabase client. Your provided RLS policy
+         * uses public.get_current_secret_id(), which relies on a 'sub' claim in the JWT,
+         * and the policy is set TO authenticated. For this client-side app to work:
+         * 1. The user must be explicitly logged in (via sign-in flow).
+         * 2. OR, for a simple anonymous chat, you must relax the RLS policy on the 
+         * 'messages' table to allow general SELECT and INSERT access.
+         * Otherwise, you will get "Row Level Security policy violation" errors when loading/sending data.
+         */
+
+        // --- GLOBAL VARIABLES ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'chat-thing-idk-default';
+        
+        let supabase = null;
+        let uniqueSessionId = null;     
+        let currentUserId = null;       // The role's secret_id (e.g., 'KEY_CORVEXIS_ALPHA')
+        let currentUserAlias = "Guest";
+        let currentTheme = { bg: 'bg-gray-500', accent: 'bg-gray-600', hover: 'hover:bg-gray-500' };
+        let isReady = false; 
+
+        // --- Local Storage Keys ---
+        const LS_USER_ID_KEY = `${appId}_simulated_user_id`;
+        const LS_SESSION_ID_KEY = `${appId}_session_id`;
+
+
+        // --- Theme Configuration (uses the secret_id as the key) ---
+        const themeMap = {
+            // Corvexis (Blue)
+            'KEY_CORVEXIS_ALPHA': { alias: 'Corvexis', name: 'Blue Shift', bg: 'bg-blue-600', accent: 'bg-blue-700', hover: 'hover:bg-blue-500', ring: 'focus:ring-blue-400' },
+            // Sylvexis (Purple)
+            'KEY_SYLVEXIS_BETA': { alias: 'Sylvexis', name: 'Violet Trace', bg: 'bg-fuchsia-600', accent: 'bg-fuchsia-700', hover: 'hover:bg-fuchsia-500', ring: 'focus:ring-fuchsia-400' },
+            // TestUser (Green)
+            'GuestTester789': { alias: 'TestUser', name: 'Emerald Flux', bg: 'bg-green-600', accent: 'bg-green-700', hover: 'hover:bg-green-500', ring: 'focus:ring-green-400' },
+            // Default Theme
+            'default': { alias: 'Guest', name: 'Gray Dust', bg: 'bg-gray-600', accent: 'bg-gray-700', hover: 'hover:bg-gray-500', ring: 'focus:ring-gray-400' }
+        };
+
+        // --- DOM Elements ---
+        const chatBox = document.getElementById('chat-box');
+        const messageForm = document.getElementById('message-form');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const themeIndicator = document.getElementById('theme-indicator');
+        const userInfoElement = document.getElementById('user-info');
+        const errorMessage = document.getElementById('error-message');
+        const roleSelectorModal = document.getElementById('role-selector-modal');
+        const roleSwitchButton = document.getElementById('role-switch-button');
+        const roleSelectorForm = document.getElementById('role-selector-form');
+        const cancelRoleSwitch = document.getElementById('cancel-role-switch');
+        const mainTitleElement = document.getElementById('main-title');
+
+
+        // --- Utility Functions ---
+
+        /**
+         * Applies the selected theme to the relevant UI elements.
+         * @param {object} theme - The theme object.
+         */
+        function applyTheme(theme) {
+            // Remove previous classes
+            sendButton.className = sendButton.className.replace(/\b(bg|hover:bg)-[a-z]+-\d{3,4}\b/g, '');
+            messageInput.className = messageInput.className.replace(/\b(focus:ring)-[a-z]+-\d{3,4}\b/g, '');
+            
+            // Apply new classes
+            sendButton.classList.add(theme.bg, theme.hover);
+            messageInput.classList.add(theme.ring);
+
+            // Update header main title
+            if (mainTitleElement) {
+                mainTitleElement.textContent = theme.alias;
+            }
+
+            // Update header indicator
+            themeIndicator.className = themeIndicator.className.replace(/\b(bg|text)-[a-z]+-\d{3,4}\b/g, '');
+            themeIndicator.classList.add(theme.bg);
+            themeIndicator.textContent = theme.alias;
+
+            // Update user info - shows the chosen secret ID/alias
+            userInfoElement.textContent = `Secret ID: ${currentUserId} | Role: ${theme.alias}`;
+
+            // Store for message rendering
+            currentTheme = theme;
+        }
+
+        /**
+         * Scrolls the chat box to the bottom.
+         */
+        function scrollToBottom() {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        /**
+         * Converts ISO timestamp from Supabase to a Date object.
+         * @param {string} isoTimestamp - The ISO 8601 timestamp string.
+         * @returns {Date} The converted Date object.
+         */
+        function parseSupabaseTimestamp(isoTimestamp) {
+            try {
+                return new Date(isoTimestamp);
+            } catch (e) {
+                console.error("Failed to parse timestamp:", isoTimestamp, e);
+                return new Date();
+            }
+        }
+
+        /**
+         * Renders a single message element.
+         * @param {object} message - The message object from Supabase.
+         * @param {string} localUserId - The current user's secret ID.
+         * @returns {HTMLElement} The created message div.
+         */
+        function renderMessage(message, localUserId) {
+            // Use the currently selected currentUserId (simulated ID) for comparison
+            const isMe = message.sender_secret_id === localUserId; 
+            // Get the sender's theme (using their secret ID/alias)
+            const theme = themeMap[message.sender_secret_id] || themeMap['default'];
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
+
+            const contentDiv = document.createElement('div');
+            
+            const bubbleClasses = isMe 
+                ? `${theme.bg} text-white rounded-3xl rounded-br-md` 
+                : 'bg-gray-700 text-gray-200 rounded-3xl rounded-tl-md';
+            
+            contentDiv.className = `max-w-xs md:max-w-md lg:max-w-lg p-3 sm:p-4 shadow-lg transition duration-150 ease-in-out transform hover:scale-[1.01] ${bubbleClasses}`;
+            
+            // Sender Alias
+            const senderSpan = document.createElement('span');
+            const aliasColorClass = isMe ? 'text-white/80' : 'text-gray-300';
+            senderSpan.className = `text-xs font-semibold block mb-1 ${aliasColorClass}`;
+            senderSpan.textContent = theme.alias; 
+            contentDiv.appendChild(senderSpan);
+
+            // Message Content
+            const textP = document.createElement('p');
+            textP.className = 'text-sm sm:text-base whitespace-pre-wrap break-words';
+            textP.textContent = message.content;
+            contentDiv.appendChild(textP);
+
+            // Timestamp
+            const timeSpan = document.createElement('span');
+            const timeColorClass = isMe ? 'text-white/70' : 'text-gray-400';
+            timeSpan.className = `block mt-1 text-xs opacity-70 ${timeColorClass}`;
+            
+            let displayTime = '...';
+            if (message.created_at) {
+                const date = parseSupabaseTimestamp(message.created_at);
+                displayTime = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            }
+            timeSpan.textContent = displayTime;
+            contentDiv.appendChild(timeSpan);
+
+            messageDiv.appendChild(contentDiv);
+            return messageDiv;
+        }
+
+        /**
+         * Switches the local user ID and applies the corresponding theme.
+         * @param {string} newUserId - The secret ID to simulate.
+         */
+        function switchUserRole(newUserId) {
+            if (!newUserId) return;
+
+            currentUserId = newUserId;
+            try {
+                localStorage.setItem(LS_USER_ID_KEY, currentUserId);
+            } catch (e) {
+                console.warn("localStorage not available, role will not persist.");
+            }
+            
+            // If the ID is not in the predefined map, use the default theme but keep the custom ID
+            const theme = themeMap[currentUserId] || themeMap['default'];
+            currentUserAlias = theme.alias;
+            applyTheme(theme);
+        }
+
+
+        // --- Supabase Setup ---
+
+        /**
+         * Initializes Supabase and sets up session ID.
+         */
+        function initializeAndAuth() {
+            if (SUPABASE_URL === 'YOUR_SUPABASE_PROJECT_URL' || SUPABASE_KEY === 'YOUR_SUPABASE_ANON_KEY') {
+                const errorMsg = 'ERROR: Supabase credentials must be configured in the script section.';
+                document.getElementById('loading-indicator').textContent = errorMsg;
+                console.error(errorMsg);
+                return;
+            }
+            
+            try {
+                // 1. Initialize Supabase Client
+                supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+                // 2. Establish unique Session ID for custom user fallback (if needed)
+                let sessionId = localStorage.getItem(LS_SESSION_ID_KEY);
+                if (!sessionId) {
+                    sessionId = crypto.randomUUID();
+                    localStorage.setItem(LS_SESSION_ID_KEY, sessionId);
+                }
+                uniqueSessionId = sessionId;
+                isReady = true;
+
+                // 3. Determine simulated role/theme
+                let simulatedId = localStorage.getItem(LS_USER_ID_KEY);
+                
+                // If no ID is saved, use a default ID and show the modal
+                if (!simulatedId) {
+                    simulatedId = 'GuestTester789'; 
+                    roleSelectorModal.classList.remove('hidden'); 
+                } else {
+                    roleSelectorModal.classList.add('hidden');
+                }
+                
+                switchUserRole(simulatedId);
+
+                // 4. Enable UI and start listener
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                document.getElementById('loading-indicator').textContent = 'Welcome! Start chatting below.';
+                
+                setupRealtimeListener();
+
+            } catch (error) {
+                console.error("Initialization Error:", error);
+                document.getElementById('loading-indicator').textContent = `Initialization failed: ${error.message}`;
+                messageInput.disabled = true;
+                sendButton.disabled = true;
+            }
+        }
+
+        /**
+         * Fetches initial messages and sets up the real-time Supabase listener.
+         */
+        async function setupRealtimeListener() {
+            if (!supabase || !isReady) return;
+            
+            const MESSAGES_TABLE = 'messages';
+
+            // 1. Fetch initial messages
+            const { data: initialMessages, error: fetchError } = await supabase
+                .from(MESSAGES_TABLE)
+                .select('sender_secret_id, content, created_at')
+                .order('created_at', { ascending: true });
+
+            if (fetchError) {
+                console.error("Supabase Fetch Error (Check RLS/Table Existence):", fetchError);
+                // Inform the user about the likely RLS issue if data fetching fails
+                errorMessage.textContent = `Failed to load messages: ${fetchError.message}. Check RLS policy on 'messages' table or table existence.`;
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            // Render initial messages
+            chatBox.innerHTML = '';
+            initialMessages.forEach(message => {
+                const messageElement = renderMessage(message, currentUserId);
+                chatBox.appendChild(messageElement);
+            });
+            scrollToBottom();
+            
+            // 2. Setup Realtime Subscription
+            // The subscription listens for any INSERT event on the messages table
+            supabase
+                .channel('room-1') // Channel name can be anything unique
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE }, (payload) => {
+                    if (payload.new) {
+                        const messageElement = renderMessage(payload.new, currentUserId);
+                        chatBox.appendChild(messageElement);
+                        scrollToBottom();
+                    }
+                })
+                .subscribe();
+                
+            console.log('Supabase Realtime subscription active.');
+        }
+
+        /**
+         * Handles sending a new message to Supabase.
+         * @param {Event} e - The form submission event.
+         */
+        async function handleSendMessage(e) {
+            e.preventDefault();
+
+            if (!supabase || !currentUserId) {
+                errorMessage.textContent = 'Chat not ready. Please check Supabase configuration.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            const content = messageInput.value.trim();
+            if (content.length === 0) {
+                messageInput.focus();
+                return;
+            }
+
+            // Message data uses the currentUserId (the selected secret_id)
+            const messageData = {
+                sender_secret_id: currentUserId, 
+                content: content,
+                // created_at is automatically handled by the Supabase database default
+            };
+            
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+            errorMessage.classList.add('hidden');
+
+            try {
+                // Exponential Backoff implementation for API call stability
+                const maxRetries = 5;
+                let delay = 1000;
+                
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        const { error } = await supabase
+                            .from('messages')
+                            .insert([messageData]);
+
+                        if (error) {
+                            throw new Error(error.message);
+                        }
+                        
+                        messageInput.value = ''; // Clear input on success
+                        break; // Exit loop on success
+                    } catch (err) {
+                        if (i === maxRetries - 1) {
+                            throw err; // Re-throw on final failure
+                        }
+                        // Wait for delay before retrying
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; // Exponential backoff
+                    }
+                }
+            } catch (error) {
+                console.error("Error sending message to Supabase:", error);
+                errorMessage.textContent = `Error sending message: ${error.message}.`;
+                errorMessage.classList.remove('hidden');
+            } finally {
+                // Re-enable inputs
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        // --- Modal/Role Selector Handlers ---
+        
+        roleSwitchButton.addEventListener('click', () => {
+            roleSelectorModal.classList.remove('hidden');
+        });
+
+        cancelRoleSwitch.addEventListener('click', () => {
+            roleSelectorModal.classList.add('hidden');
+        });
+
+        roleSelectorForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const selectedRadio = formData.get('simulated_id');
+            const customInput = formData.get('custom_id').trim();
+            
+            let newId = selectedRadio || customInput;
+
+            if (newId) {
+                // If a custom ID is provided that isn't in the theme map, it will use 'default' theme
+                // but the custom ID will be used as the sender_secret_id.
+                switchUserRole(newId);
+                roleSelectorModal.classList.add('hidden'); 
+                document.getElementById('custom_id').value = '';
+            } else {
+                 // Fallback to the unique session ID if nothing predefined is selected/entered
+                switchUserRole(uniqueSessionId);
+                roleSelectorModal.classList.add('hidden');
+            }
+        });
+
+
+        // --- Event Listeners and Initialization ---
+
+        window.onload = initializeAndAuth;
+        
+        if (messageForm) {
+            messageForm.addEventListener('submit', handleSendMessage);
+        }
+
+    </script>
+</body>
+</html>
