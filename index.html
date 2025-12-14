@@ -122,11 +122,14 @@
         const messageInput = document.getElementById('message-input');
 
 
-        // Function to scroll chat to the bottom
+        /**
+         * Function to scroll chat to the bottom.
+         * Changed delay to 0ms for faster responsiveness.
+         */
         function scrollToBottom() {
             setTimeout(() => {
                 chatContainer.scrollTop = chatContainer.scrollHeight;
-            }, 50);
+            }, 0); 
         }
 
         /**
@@ -137,7 +140,10 @@
             const messageElement = document.createElement('div');
             messageElement.classList.add('flex', isMe ? 'justify-end' : 'justify-start');
 
-            const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
+            // Use msg.created_at or current time if missing (robustness for Realtime payloads)
+            const time = msg.created_at 
+                ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+                : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             messageElement.innerHTML = `
                 <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-xs md:max-w-md">
@@ -287,8 +293,8 @@
                         return; 
                     }
                     
-                    // Append the new message for all other clients (receivers)
-                    console.log('Appending new message from remote user.');
+                    // Appending the new message for all other clients (receivers)
+                    console.log('RECEIVER: Appending new message from remote user instantly.');
                     appendMessage(newMessage);
 
                 })
@@ -306,6 +312,9 @@
             const text = messageInput.value.trim();
             if (text === "" || !userId || !supabaseClient) return;
 
+            // Clear prior error messages
+            authMessage.textContent = ''; 
+            
             // Construct the message object to send
             const messageToSend = {
                 text: text,
@@ -314,6 +323,7 @@
 
             try {
                 // Insert the new message into the table and retrieve the generated row
+                // This select() guarantees we get the database-generated timestamp (created_at)
                 const { data, error } = await supabaseClient
                     .from(MESSAGES_TABLE_NAME)
                     .insert([messageToSend])
@@ -324,7 +334,9 @@
                     throw new Error(error.message);
                 }
                 
-                // Append the message immediately
+                console.log("SENDER: Message successfully inserted and retrieved. Appending locally for instant display:", data);
+                
+                // Append the message immediately for the SENDER
                 appendMessage(data); 
 
                 messageInput.value = '';
@@ -332,8 +344,6 @@
 
             } catch (error) {
                 console.error("Error sending message:", error);
-                // Display error to user
-                // Use a custom message box instead of alert()
                 document.getElementById('auth-message').textContent = 'Error sending message. Check console for details.';
             }
         }
