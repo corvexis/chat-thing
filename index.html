@@ -8,7 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Use Inter font -->
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght=100..900&display=swap');
         body { font-family: 'Inter', sans-serif; }
         /* Custom scrollbar for chat-box */
         #chat-box::-webkit-scrollbar { width: 8px; }
@@ -151,15 +151,9 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'chat-thing-idk-default';
         
         let supabase = null;
-        let uniqueSessionId = null;     
         let currentUserId = null;       // The role's secret_id (e.g., 'KEY_CORVEXIS_ALPHA')
         let currentUserAlias = "Guest";
         let isReady = false; 
-
-        // --- Local Storage Keys ---
-        const LS_USER_ID_KEY = `${appId}_simulated_user_id`;
-        const LS_SESSION_ID_KEY = `${appId}_session_id`;
-
 
         // --- Theme Configuration (maps secret_id to styling) ---
         const themeMap = {
@@ -291,11 +285,6 @@
             if (!newUserId) return;
 
             currentUserId = newUserId;
-            try {
-                localStorage.setItem(LS_USER_ID_KEY, currentUserId);
-            } catch (e) {
-                console.warn("localStorage not available, role will not persist.");
-            }
             
             const theme = themeMap[currentUserId] || themeMap['default'];
             currentUserAlias = theme.alias;
@@ -322,16 +311,9 @@
                 // 1. Initialize Supabase Client
                 supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-                // 2. Determine simulated role/theme
-                let simulatedId = localStorage.getItem(LS_USER_ID_KEY);
-                
-                // If no ID is saved, use a default ID and show the modal
-                if (!simulatedId) {
-                    simulatedId = 'GuestTester789'; 
-                    roleSelectorModal.classList.remove('hidden'); 
-                } else {
-                    roleSelectorModal.classList.add('hidden');
-                }
+                // 2. Determine simulated role/theme (Always default and show modal)
+                let simulatedId = 'GuestTester789'; // Default ID
+                roleSelectorModal.classList.remove('hidden'); 
                 
                 switchUserRole(simulatedId);
 
