@@ -198,7 +198,8 @@
         }
 
 
-        async function handleAuth(type) {
+        // FIX: Expose handleAuth to the global window object
+        window.handleAuth = async function(type) {
             const email = authEmail.value.trim();
             const password = authPassword.value.trim();
 
@@ -211,6 +212,7 @@
 
             let error;
             if (type === 'signup') {
+                // In Supabase, email must be unique. The 'username' is implicit in the email field.
                 const { error: signUpError } = await supabaseClient.auth.signUp({ email, password });
                 error = signUpError;
             } else {
@@ -227,6 +229,7 @@
             }
         }
 
+        // FIX: Expose handleLogout to the global window object
         window.handleLogout = async function() {
             const { error } = await supabaseClient.auth.signOut();
             if (error) {
@@ -298,6 +301,7 @@
                 });
         }
 
+        // This function is now exposed to the window object
         window.sendMessage = async function() {
             const text = messageInput.value.trim();
             if (text === "" || !userId || !supabaseClient) return;
@@ -329,7 +333,8 @@
             } catch (error) {
                 console.error("Error sending message:", error);
                 // Display error to user
-                alert('Error sending message. Check console for details.'); 
+                // Use a custom message box instead of alert()
+                document.getElementById('auth-message').textContent = 'Error sending message. Check console for details.';
             }
         }
 
