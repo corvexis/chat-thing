@@ -66,14 +66,17 @@
     </div>
 
     <script type="module">
+        // NOTE: While Firestore is preferred for persistent storage, localStorage is used here
+        // to manage the anonymous user ID for simple chat applications.
+
         // --- Supabase Client Import ---
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.0/+esm'
 
         // --- Supabase Configuration (***REPLACE THESE WITH YOUR ACTUAL KEYS***) ---
         const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4'; 
-
         const MESSAGES_TABLE_NAME = 'messages'; 
+        const USER_ID_KEY = 'chat_user_id'; // localStorage key for user persistence
 
         let supabaseClient;
         let userId;
@@ -99,7 +102,8 @@
          * @returns {HTMLElement} The styled message div.
          */
         function createMessageElement(msg) {
-            const isMe = msg.sender_id === userId;
+            // CRITICAL FIX: The check relies on the persisted userId
+            const isMe = msg.sender_id === userId; 
             const messageElement = document.createElement('div');
             messageElement.classList.add('flex', isMe ? 'justify-end' : 'justify-start');
 
@@ -140,17 +144,22 @@
             }
 
             try {
+                // FIX: Retrieve or generate persistent userId using localStorage
+                let storedId = localStorage.getItem(USER_ID_KEY);
+                if (!storedId) {
+                    storedId = crypto.randomUUID();
+                    localStorage.setItem(USER_ID_KEY, storedId);
+                }
+                userId = storedId;
+                
                 // Initialize client
                 supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                
-                // Simulate authentication: use a random UUID as the senderId for this session
-                userId = crypto.randomUUID();
                 
                 authStatus.textContent = 'Connected (Anon)';
                 authStatus.classList.replace('text-red-400', 'text-green-400');
                 currentUserIdElement.textContent = `User ID: ${userId}`;
                 sendButton.disabled = false;
-                console.log(`Supabase initialized. Session User ID: ${userId}`);
+                console.log(`Supabase initialized. Persistent Session User ID: ${userId}`);
                 
                 // Start the listener and fetch history
                 startMessageListener();
@@ -199,13 +208,19 @@
                     
                     const newMessage = payload.new;
 
-                    // FIX: Prevent double display for the sender
-                    if (newMessage.sender_id === userId) {
-                        console.log('Ignoring own message from Realtime event.');
-                        return; // Sender already appended this message locally
+                    if (!newMessage || !newMessage.sender_id) {
+                        console.error("Realtime payload missing message data.");
+                        return;
                     }
 
-                    // FIX: Append the new message for all other clients
+                    // FIX: Prevent double display for the sender by checking the persistent ID
+                    if (newMessage.sender_id === userId) {
+                        console.log('Ignoring own message from Realtime event (already appended locally).');
+                        return; 
+                    }
+                    
+                    // CRITICAL FIX: Append the new message for all other clients (receivers)
+                    console.log('Appending new message from remote user.');
                     appendMessage(newMessage);
 
                 })
@@ -227,15 +242,14 @@
             // Construct the message object to send
             const messageToSend = {
                 text: text,
-                sender_id: userId,
+                sender_id: userId, // Uses the persistent ID
             };
 
             try {
-                // Insert the new message into the table
+                // Insert the new message into the table and retrieve the generated row
                 const { data, error } = await supabaseClient
                     .from(MESSAGES_TABLE_NAME)
                     .insert([messageToSend])
-                    // We need to request the inserted data back to get the 'created_at' timestamp
                     .select() 
                     .single(); 
 
@@ -243,7 +257,8 @@
                     throw new Error(error.message);
                 }
                 
-                // FIX: Append the message immediately using the returned data (which includes created_at)
+                // CRITICAL FIX: Append the message immediately using the returned data (which includes created_at)
+                // This message will be correctly aligned because 'data.sender_id' will match the persistent 'userId'
                 appendMessage(data); 
 
                 messageInput.value = '';
