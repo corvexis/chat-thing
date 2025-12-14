@@ -137,13 +137,23 @@
                 if (user) {
                     userId = user.uid;
                     await checkAndFetchUserProfile(user.uid);
-                    renderApp();
                 } else {
                     userId = null;
                     username = null;
+                }
+                // The listener is the single source of truth for calling renderApp
+                renderApp(); 
+            });
+
+            // FIX: Add a timeout to force an initial render if the auth listener is delayed, 
+            // preventing the app from getting stuck on the loading screen.
+            setTimeout(() => {
+                if (!isAuthReady) {
+                    console.warn("Auth Listener delayed, forcing initial render to Auth Screen.");
+                    isAuthReady = true;
                     renderApp();
                 }
-            });
+            }, 3000); // 3 second delay
 
         } catch (error) {
             console.error("Firebase Initialization Error:", error);
@@ -212,7 +222,8 @@
         const subscribeToMessages = () => {
             if (!isAuthReady || !userId) return () => {};
 
-            const messagesQuery = query(getMessagesCollectionRef(), orderBy('timestamp', 'asc'));
+            // NOTE: orderBy is kept but may require Firestore index setup in a real environment
+            const messagesQuery = query(getMessagesCollectionRef(), orderBy('timestamp', 'asc')); 
 
             return onSnapshot(messagesQuery, (snapshot) => {
                 const messages = [];
