@@ -3,527 +3,437 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat Thing IDK - Supabase Chat</title>
-    <!-- Load Tailwind CSS -->
+    <title>Expressive Dark Chat</title>
+    <!-- Load Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Use Inter font -->
+    <!-- Load Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        /* Custom scrollbar for chat-box */
-        #chat-box::-webkit-scrollbar { width: 8px; }
-        #chat-box::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 4px; }
-        #chat-box::-webkit-scrollbar-track { background-color: #1f2937; }
+        /* Deep Dark Mode Theme - Mimicking M3 Expressive */
+        :root {
+            --color-primary: #D0BCFF; /* M3 Primary */
+            --color-on-surface: #E6E1E5; /* M3 On Surface */
+            --color-surface-container: #211F26; /* M3 Surface Container (Deep Dark) */
+            --color-surface-container-low: #1C1B20; /* M3 Background */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-surface-container-low);
+            color: var(--color-on-surface);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        /* Custom scrollbar for chat window */
+        #message-list {
+            scrollbar-width: thin;
+            scrollbar-color: #555 #1C1B20;
+        }
+        #message-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        #message-list::-webkit-scrollbar-track {
+            background: #1C1B20;
+        }
+        #message-list::-webkit-scrollbar-thumb {
+            background-color: #555;
+            border-radius: 20px;
+            border: 2px solid #1C1B20;
+        }
+        /* Custom focused input style */
+        .custom-input:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 2px rgba(208, 188, 255, 0.5); /* Primary tint shadow */
+        }
+        /* Style for the Primary Button */
+        .primary-button {
+            background-color: var(--color-primary);
+            color: #1C1B20; /* Color on Primary */
+            transition: transform 0.1s, box-shadow 0.2s;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+        .primary-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.6);
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col antialiased">
+<body class="min-h-screen flex flex-col antialiased">
 
-    <!-- Main Application Container (increased roundness) -->
-    <div id="app" class="flex flex-col flex-grow w-full max-w-4xl mx-auto shadow-2xl rounded-3xl overflow-hidden my-4 sm:my-8 bg-gray-800">
-        
-        <!-- Header -->
-        <header class="p-4 sm:p-6 text-center text-xl font-bold border-b border-gray-700 flex justify-between items-center">
-            <!-- Now shows Secret ID and Simulated Role -->
-            <span class="text-gray-400 text-sm font-medium hidden sm:block" id="user-info">Loading...</span>
-            <!-- Title now has an ID to dynamically update the user's name/alias -->
-            <h1 class="text-white text-2xl" id="main-title">Chat Thing IDK</h1>
-            
-            <div class="flex items-center space-x-3">
-                <button id="role-switch-button" class="p-2 rounded-full transition duration-150 text-gray-400 hover:text-white hover:bg-gray-700" title="Switch User Role / Theme">
-                    <!-- Icon for User/Switching (Lucide/Heroicons equivalent) -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
-                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M16 11l-4 4-4-4"/>
-                    </svg>
-                </button>
-                <span class="text-xs px-3 py-1 rounded-full text-white font-semibold" id="theme-indicator"></span>
-            </div>
-        </header>
-
-        <!-- Chat Messages Area -->
-        <main id="chat-box" class="flex-grow p-4 sm:p-6 overflow-y-auto space-y-4 max-h-[70vh] min-h-[50vh] scroll-smooth">
-            <!-- The message here is updated by JS. Any failure will show the error here. -->
-            <div id="loading-indicator" class="text-center text-gray-500 text-lg font-medium">Connecting to Supabase...</div>
-        </main>
-
-        <!-- Message Input Form (Distinct background for visual separation) -->
-        <div class="p-4 sm:p-6 bg-gray-700">
-            <form id="message-form" class="flex space-x-3">
-                <input
-                    type="text"
-                    id="message-input"
-                    placeholder="Type your message..."
-                    class="flex-grow p-3 text-sm bg-gray-600 text-white border-none rounded-full focus:ring-4 focus:ring-opacity-50 transition duration-150 shadow-inner disabled:opacity-50"
-                    autocomplete="off"
-                    required
-                    disabled
-                >
-                <button
-                    type="submit"
-                    id="send-button"
-                    class="px-6 py-3 text-sm font-semibold rounded-full text-white transition duration-150 shadow-md hover:shadow-lg disabled:opacity-50"
-                    disabled
-                >
-                    Send
-                </button>
-            </form>
-            <div id="error-message" class="mt-2 text-red-400 text-xs hidden"></div>
-        </div>
+    <!-- Main Application Container -->
+    <div id="app" class="flex flex-col flex-grow w-full max-w-7xl mx-auto p-4 md:p-8">
+        <!-- Content will be injected here: Auth or Chat -->
     </div>
 
-    <!-- Role Selector Modal -->
-    <div id="role-selector-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center hidden">
-        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <h2 class="text-2xl font-bold text-white mb-6 border-b border-gray-700 pb-3">Simulate User Role</h2>
-            <p class="text-sm text-gray-400 mb-6">Select a known ID to test its custom theme, or enter a custom ID to use the default theme. This ID will be used as the `sender_secret_id` in the database.</p>
-            
-            <form id="role-selector-form" class="space-y-4">
-                
-                <div class="space-y-3">
-                    <label class="block text-sm font-medium text-gray-300">Predefined Users (Secret IDs from DB):</label>
-                    <div class="flex flex-col space-y-2">
-                        <!-- Corvexis Role -->
-                        <label class="inline-flex items-center p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition">
-                            <input type="radio" name="simulated_id" value="KEY_CORVEXIS_ALPHA" class="form-radio h-4 w-4 text-blue-500 border-gray-600 focus:ring-blue-500">
-                            <span class="ml-3 text-white font-medium">Corvexis</span>
-                            <span class="ml-auto text-xs text-blue-400">(KEY_CORVEXIS_ALPHA)</span>
-                        </label>
-                        <!-- Sylvexis Role -->
-                        <label class="inline-flex items-center p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition">
-                            <input type="radio" name="simulated_id" value="KEY_SYLVEXIS_BETA" class="form-radio h-4 w-4 text-fuchsia-500 border-gray-600 focus:ring-fuchsia-500">
-                            <span class="ml-3 text-white font-medium">Sylvexis</span>
-                            <span class="ml-auto text-xs text-fuchsia-400">(KEY_SYLVEXIS_BETA)</span>
-                         </label>
-                         <!-- TestUser Role -->
-                        <label class="inline-flex items-center p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition">
-                            <input type="radio" name="simulated_id" value="GuestTester789" class="form-radio h-4 w-4 text-green-500 border-gray-600 focus:ring-green-500">
-                            <span class="ml-3 text-white font-medium">TestUser</span>
-                            <span class="ml-auto text-xs text-green-400">(GuestTester789)</span>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Custom ID Input -->
-                <div>
-                    <label for="custom_id" class="block text-sm font-medium text-gray-300 mb-1">Or enter a custom User ID:</label>
-                    <input
-                        type="text"
-                        id="custom_id"
-                        name="custom_id"
-                        placeholder="Enter any ID for testing"
-                        class="w-full p-3 text-sm bg-gray-700 text-white border border-gray-600 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-gray-500 transition"
-                        oninput="document.querySelectorAll('input[name=simulated_id]').forEach(r => r.checked = false);"
-                    >
-                </div>
-
-                <div class="flex justify-end pt-2 space-x-3">
-                    <button type="button" id="cancel-role-switch" class="px-5 py-2 text-sm font-medium rounded-lg text-gray-300 hover:bg-gray-700 transition">
-                        Cancel
-                    </button>
-                    <button type="submit" class="px-5 py-2 text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition">
-                        Apply Role
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-
-    <!-- Supabase Script -->
+    <!-- Firebase SDK Imports -->
     <script type="module">
-        // Import Supabase client
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, orderBy, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- SUPABASE CONFIGURATION (MUST BE UPDATED BY USER) ---
-        // NOTE: Replace these with your actual Supabase project URL and anon key.
-        const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; 
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4';
-        
-        // --- GLOBAL VARIABLES ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'chat-thing-idk-default';
-        
-        let supabase = null;
-        let uniqueSessionId = null;     
-        let currentUserId = null;       // The role's secret_id (e.g., 'KEY_CORVEXIS_ALPHA')
-        let currentUserAlias = "Guest";
-        let currentTheme = { bg: 'bg-gray-500', accent: 'bg-gray-600', hover: 'hover:bg-gray-500' };
-        let isReady = false; 
+        // IMPORTANT: Global variables are provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        // --- Local Storage Keys ---
-        const LS_USER_ID_KEY = `${appId}_simulated_user_id`;
-        const LS_SESSION_ID_KEY = `${appId}_session_id`;
+        // Initialize Firebase
+        let app;
+        let db;
+        let auth;
+        let userId = null;
+        let username = null;
+        let isAuthReady = false;
 
+        const appDiv = document.getElementById('app');
 
-        // --- Theme Configuration (uses the secret_id as the key) ---
-        const themeMap = {
-            // Corvexis (Blue)
-            'KEY_CORVEXIS_ALPHA': { alias: 'Corvexis', name: 'Blue Shift', bg: 'bg-blue-600', accent: 'bg-blue-700', hover: 'hover:bg-blue-500', ring: 'focus:ring-blue-400' },
-            // Sylvexis (Purple)
-            'KEY_SYLVEXIS_BETA': { alias: 'Sylvexis', name: 'Violet Trace', bg: 'bg-fuchsia-600', accent: 'bg-fuchsia-700', hover: 'hover:bg-fuchsia-500', ring: 'focus:ring-fuchsia-400' },
-            // TestUser (Green)
-            'GuestTester789': { alias: 'TestUser', name: 'Emerald Flux', bg: 'bg-green-600', accent: 'bg-green-700', hover: 'hover:bg-green-500', ring: 'focus:ring-green-400' },
-            // Default Theme
-            'default': { alias: 'Guest', name: 'Gray Dust', bg: 'bg-gray-600', accent: 'bg-gray-700', hover: 'hover:bg-gray-500', ring: 'focus:ring-gray-400' }
+        // Utility function for exponential backoff retry logic
+        const fetchWithRetry = async (fn, maxRetries = 5) => {
+            let attempt = 0;
+            while (attempt < maxRetries) {
+                try {
+                    return await fn();
+                } catch (error) {
+                    if (attempt === maxRetries - 1) throw error;
+                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                    console.warn(`Retry attempt ${attempt + 1}/${maxRetries}. Delaying for ${delay}ms. Error:`, error.message);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    attempt++;
+                }
+            }
         };
 
-        // --- DOM Elements ---
-        const chatBox = document.getElementById('chat-box');
-        const messageForm = document.getElementById('message-form');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const themeIndicator = document.getElementById('theme-indicator');
-        const userInfoElement = document.getElementById('user-info');
-        const errorMessage = document.getElementById('error-message');
-        const roleSelectorModal = document.getElementById('role-selector-modal');
-        const roleSwitchButton = document.getElementById('role-switch-button');
-        const roleSelectorForm = document.getElementById('role-selector-form');
-        const cancelRoleSwitch = document.getElementById('cancel-role-switch');
-        const mainTitleElement = document.getElementById('main-title');
-        const loadingIndicator = document.getElementById('loading-indicator');
 
+        // --- FIREBASE INITIALIZATION & AUTHENTICATION ---
 
-        // --- Utility Functions ---
+        try {
+            // Set log level to debug for better visibility of Firestore operations
+            setLogLevel('Debug');
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
 
-        /**
-         * Applies the selected theme to the relevant UI elements.
-         * @param {object} theme - The theme object.
-         */
-        function applyTheme(theme) {
-            // Remove previous classes
-            sendButton.className = sendButton.className.replace(/\b(bg|hover:bg)-[a-z]+-\d{3,4}\b/g, '');
-            messageInput.className = messageInput.className.replace(/\b(focus:ring)-[a-z]+-\d{3,4}\b/g, '');
-            
-            // Apply new classes
-            sendButton.classList.add(theme.bg, theme.hover);
-            messageInput.classList.add(theme.ring);
-
-            // Update header main title
-            if (mainTitleElement) {
-                mainTitleElement.textContent = theme.alias;
-            }
-
-            // Update header indicator
-            themeIndicator.className = themeIndicator.className.replace(/\b(bg|text)-[a-z]+-\d{3,4}\b/g, '');
-            themeIndicator.classList.add(theme.bg);
-            themeIndicator.textContent = theme.alias;
-
-            // Update user info - shows the chosen secret ID/alias
-            userInfoElement.textContent = `Secret ID: ${currentUserId} | Role: ${theme.alias}`;
-
-            // Store for message rendering
-            currentTheme = theme;
-        }
-
-        /**
-         * Scrolls the chat box to the bottom.
-         */
-        function scrollToBottom() {
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        /**
-         * Converts ISO timestamp from Supabase to a Date object.
-         * @param {string} isoTimestamp - The ISO 8601 timestamp string.
-         * @returns {Date} The converted Date object.
-         */
-        function parseSupabaseTimestamp(isoTimestamp) {
-            try {
-                return new Date(isoTimestamp);
-            } catch (e) {
-                console.error("Failed to parse timestamp:", isoTimestamp, e);
-                return new Date();
-            }
-        }
-
-        /**
-         * Renders a single message element.
-         * @param {object} message - The message object from Supabase.
-         * @param {string} localUserId - The current user's secret ID.
-         * @returns {HTMLElement} The created message div.
-         */
-        function renderMessage(message, localUserId) {
-            // Use the currently selected currentUserId (simulated ID) for comparison
-            const isMe = message.sender_secret_id === localUserId; 
-            // Get the sender's theme (using their secret ID/alias)
-            const theme = themeMap[message.sender_secret_id] || themeMap['default'];
-
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
-
-            const contentDiv = document.createElement('div');
-            
-            const bubbleClasses = isMe 
-                ? `${theme.bg} text-white rounded-3xl rounded-br-md` 
-                : 'bg-gray-700 text-gray-200 rounded-3xl rounded-tl-md';
-            
-            contentDiv.className = `max-w-xs md:max-w-md lg:max-w-lg p-3 sm:p-4 shadow-lg transition duration-150 ease-in-out transform hover:scale-[1.01] ${bubbleClasses}`;
-            
-            // Sender Alias
-            const senderSpan = document.createElement('span');
-            const aliasColorClass = isMe ? 'text-white/80' : 'text-gray-300';
-            senderSpan.className = `text-xs font-semibold block mb-1 ${aliasColorClass}`;
-            senderSpan.textContent = theme.alias; 
-            contentDiv.appendChild(senderSpan);
-
-            // Message Content
-            const textP = document.createElement('p');
-            textP.className = 'text-sm sm:text-base whitespace-pre-wrap break-words';
-            textP.textContent = message.content;
-            contentDiv.appendChild(textP);
-
-            // Timestamp
-            const timeSpan = document.createElement('span');
-            const timeColorClass = isMe ? 'text-white/70' : 'text-gray-400';
-            timeSpan.className = `block mt-1 text-xs opacity-70 ${timeColorClass}`;
-            
-            let displayTime = '...';
-            if (message.created_at) {
-                const date = parseSupabaseTimestamp(message.created_at);
-                displayTime = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            }
-            timeSpan.textContent = displayTime;
-            contentDiv.appendChild(timeSpan);
-
-            messageDiv.appendChild(contentDiv);
-            return messageDiv;
-        }
-
-        /**
-         * Switches the local user ID and applies the corresponding theme.
-         * @param {string} newUserId - The secret ID to simulate.
-         */
-        function switchUserRole(newUserId) {
-            if (!newUserId) return;
-
-            currentUserId = newUserId;
-            try {
-                localStorage.setItem(LS_USER_ID_KEY, currentUserId);
-            } catch (e) {
-                console.warn("localStorage not available, role will not persist.");
-            }
-            
-            // If the ID is not in the predefined map, use the default theme but keep the custom ID
-            const theme = themeMap[currentUserId] || themeMap['default'];
-            currentUserAlias = theme.alias;
-            applyTheme(theme);
-        }
-
-
-        // --- Supabase Setup ---
-
-        /**
-         * Initializes Supabase and sets up session ID.
-         */
-        function initializeAndAuth() {
-            loadingIndicator.classList.add('text-lg', 'font-medium', 'text-gray-500');
-            loadingIndicator.classList.remove('text-red-400', 'font-bold', 'whitespace-pre-wrap');
-            
-            if (SUPABASE_URL === 'YOUR_SUPABASE_PROJECT_URL' || SUPABASE_KEY === 'YOUR_SUPABASE_ANON_KEY') {
-                const errorMsg = '🛑 FATAL ERROR: Supabase credentials must be configured in the script section (index.html).';
-                loadingIndicator.textContent = errorMsg;
-                console.error(errorMsg);
-                loadingIndicator.classList.add('text-red-400', 'font-bold', 'whitespace-pre-wrap');
-                return; // STOP EXECUTION HERE
-            }
-            
-            try {
-                // 1. Initialize Supabase Client
-                supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-                // 2. Establish unique Session ID for custom user fallback (if needed)
-                let sessionId = localStorage.getItem(LS_SESSION_ID_KEY);
-                if (!sessionId) {
-                    sessionId = crypto.randomUUID();
-                    localStorage.setItem(LS_SESSION_ID_KEY, sessionId);
-                }
-                uniqueSessionId = sessionId;
-                isReady = true;
-
-                // 3. Determine simulated role/theme
-                let simulatedId = localStorage.getItem(LS_USER_ID_KEY);
-                
-                // If no ID is saved, use a default ID and show the modal
-                if (!simulatedId) {
-                    simulatedId = 'GuestTester789'; 
-                    roleSelectorModal.classList.remove('hidden'); 
-                } else {
-                    roleSelectorModal.classList.add('hidden');
-                }
-                
-                switchUserRole(simulatedId);
-
-                // 4. Enable UI and start listener
-                messageInput.disabled = false;
-                sendButton.disabled = false;
-                loadingIndicator.textContent = 'Welcome! Data loading...';
-                
-                setupRealtimeListener();
-
-            } catch (error) {
-                console.error("Initialization Error:", error);
-                // Report error directly to the user in the main view
-                loadingIndicator.textContent = `🚨 Initialization failed! Check console. Error: ${error.message}`;
-                loadingIndicator.classList.add('text-red-400', 'font-bold', 'whitespace-pre-wrap');
-                messageInput.disabled = true;
-                sendButton.disabled = true;
-            }
-        }
-
-        /**
-         * Fetches initial messages and sets up the real-time Supabase listener.
-         */
-        async function setupRealtimeListener() {
-            if (!supabase || !isReady) return;
-            
-            const MESSAGES_TABLE = 'messages';
-
-            loadingIndicator.textContent = 'Loading chat history...';
-            
-            // 1. Fetch initial messages
-            const { data: initialMessages, error: fetchError } = await supabase
-                .from(MESSAGES_TABLE)
-                .select('sender_secret_id, content, created_at')
-                .order('created_at', { ascending: true });
-
-            if (fetchError) {
-                console.error("Supabase Fetch Error (Check RLS/Auth):", fetchError);
-                // Inform the user about the likely RLS/Auth issue
-                loadingIndicator.textContent = `❌ ERROR: Failed to load messages. This is likely an RLS/Authentication issue. Message: ${fetchError.message}`;
-                loadingIndicator.classList.add('text-red-400', 'font-bold', 'whitespace-pre-wrap');
-                
-                // Disable inputs and stop listening
-                messageInput.disabled = true;
-                sendButton.disabled = true;
-                return;
-            }
-
-            // Render initial messages
-            chatBox.innerHTML = '';
-            initialMessages.forEach(message => {
-                const messageElement = renderMessage(message, currentUserId);
-                chatBox.appendChild(messageElement);
-            });
-            scrollToBottom();
-            
-            loadingIndicator.textContent = 'Chat ready!';
-            loadingIndicator.classList.remove('text-lg', 'font-medium', 'text-gray-500');
-
-            // 2. Setup Realtime Subscription
-            supabase
-                .channel('room-1')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE }, (payload) => {
-                    if (payload.new) {
-                        const messageElement = renderMessage(payload.new, currentUserId);
-                        chatBox.appendChild(messageElement);
-                        scrollToBottom();
+            // Handle initial authentication state
+            const setupAuth = async () => {
+                try {
+                    if (initialAuthToken) {
+                        await fetchWithRetry(() => signInWithCustomToken(auth, initialAuthToken));
+                    } else {
+                        await fetchWithRetry(() => signInAnonymously(auth));
                     }
-                })
-                .subscribe();
-                
-            console.log('Supabase Realtime subscription active.');
-        }
-
-        /**
-         * Handles sending a new message to Supabase.
-         * @param {Event} e - The form submission event.
-         */
-        async function handleSendMessage(e) {
-            e.preventDefault();
-
-            if (!supabase || !currentUserId) {
-                errorMessage.textContent = 'Chat not ready. Please check Supabase configuration.';
-                errorMessage.classList.remove('hidden');
-                return;
-            }
-
-            const content = messageInput.value.trim();
-            if (content.length === 0) {
-                messageInput.focus();
-                return;
-            }
-
-            // Message data uses the currentUserId (the selected secret_id)
-            const messageData = {
-                sender_secret_id: currentUserId, 
-                content: content,
-            };
-            
-            messageInput.disabled = true;
-            sendButton.disabled = true;
-            errorMessage.classList.add('hidden');
-
-            try {
-                // Exponential Backoff implementation for API call stability
-                const maxRetries = 5;
-                let delay = 1000;
-                
-                for (let i = 0; i < maxRetries; i++) {
+                } catch (e) {
+                    console.error("Initial sign-in failed:", e);
+                    // Fallback to anonymous sign-in if token fails
                     try {
-                        const { error } = await supabase
-                            .from('messages')
-                            .insert([messageData]);
-
-                        if (error) {
-                            throw new Error(error.message);
-                        }
-                        
-                        messageInput.value = ''; // Clear input on success
-                        break; // Exit loop on success
+                         await fetchWithRetry(() => signInAnonymously(auth));
                     } catch (err) {
-                        if (i === maxRetries - 1) {
-                            throw err; // Re-throw on final failure
-                        }
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        delay *= 2; // Exponential backoff
+                        console.error("Anonymous sign-in failed:", err);
                     }
                 }
+            };
+
+            setupAuth();
+
+            // Auth State Listener
+            onAuthStateChanged(auth, async (user) => {
+                isAuthReady = true;
+                if (user) {
+                    userId = user.uid;
+                    await checkAndFetchUserProfile(user.uid);
+                    renderApp();
+                } else {
+                    userId = null;
+                    username = null;
+                    renderApp();
+                }
+            });
+
+        } catch (error) {
+            console.error("Firebase Initialization Error:", error);
+            appDiv.innerHTML = '<div class="text-red-400 p-8 text-center">Failed to initialize Firebase. Check console for details.</div>';
+        }
+
+        // --- USER PROFILE MANAGEMENT ---
+
+        const getProfileDocRef = (uid) => doc(db, `artifacts/${appId}/users/${uid}/profile/metadata`);
+
+        // Fetch or create user profile
+        const checkAndFetchUserProfile = async (uid) => {
+            const profileRef = getProfileDocRef(uid);
+            const profileSnap = await fetchWithRetry(() => getDoc(profileRef));
+
+            if (profileSnap.exists()) {
+                username = profileSnap.data().username;
+            } else if (auth.currentUser.isAnonymous) {
+                // Anonymous users get a generic temporary username
+                username = `Guest-${uid.substring(0, 4)}`;
+                // No need to save anonymous profile unless they send a message
+            } else {
+                // Logged in users MUST have a username, which should have been set during signup
+                // If it's missing (e.g., first login after anonymous), render the auth screen again.
+                // For this example, we'll assume a successful signup has set it.
+                // If the user signed up using email/pass, their username is already stored/used.
+                // If this is reached, it means a real user is missing a username, which is an error state.
+                username = 'User-Error';
+            }
+        };
+
+        const saveUserProfile = async (uid, uname) => {
+            const profileRef = getProfileDocRef(uid);
+            await fetchWithRetry(() => setDoc(profileRef, { username: uname, createdAt: serverTimestamp() }, { merge: true }));
+            username = uname;
+        };
+
+
+        // --- MESSAGE LOGIC ---
+
+        const collectionPath = `artifacts/${appId}/public/data/messages`;
+        const getMessagesCollectionRef = () => collection(db, collectionPath);
+
+        const sendMessage = async (messageText) => {
+            if (!userId || !username || !messageText.trim()) return;
+
+            // Ensure profile is saved if it's the first message from an anonymous user
+            if (auth.currentUser.isAnonymous && username.startsWith('Guest-')) {
+                 await saveUserProfile(userId, username);
+            }
+
+            try {
+                await fetchWithRetry(() => addDoc(getMessagesCollectionRef(), {
+                    text: messageText,
+                    senderId: userId,
+                    username: username,
+                    timestamp: serverTimestamp()
+                }));
+                document.getElementById('message-input').value = '';
+                scrollToBottom();
             } catch (error) {
-                console.error("Error sending message to Supabase:", error);
-                errorMessage.textContent = `Error sending message: ${error.message}.`;
-                errorMessage.classList.remove('hidden');
-            } finally {
-                // Re-enable inputs
-                messageInput.disabled = false;
-                sendButton.disabled = false;
-                messageInput.focus();
+                console.error("Error sending message: ", error);
             }
-        }
+        };
 
-        // --- Modal/Role Selector Handlers ---
-        
-        roleSwitchButton.addEventListener('click', () => {
-            roleSelectorModal.classList.remove('hidden');
-        });
+        const subscribeToMessages = () => {
+            if (!isAuthReady || !userId) return () => {};
 
-        cancelRoleSwitch.addEventListener('click', () => {
-            roleSelectorModal.classList.add('hidden');
-        });
+            const messagesQuery = query(getMessagesCollectionRef(), orderBy('timestamp', 'asc'));
 
-        roleSelectorForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const selectedRadio = formData.get('simulated_id');
-            const customInput = formData.get('custom_id').trim();
-            
-            let newId = selectedRadio || customInput;
+            return onSnapshot(messagesQuery, (snapshot) => {
+                const messages = [];
+                snapshot.forEach(doc => {
+                    messages.push({ id: doc.id, ...doc.data() });
+                });
+                renderMessageList(messages);
+            }, (error) => {
+                console.error("Error subscribing to messages: ", error);
+            });
+        };
 
-            if (newId) {
-                switchUserRole(newId);
-                roleSelectorModal.classList.add('hidden'); 
-                document.getElementById('custom_id').value = '';
-                // Since the user role changed, we should re-initialize to reload data with the new ID
-                setupRealtimeListener(); 
+
+        // --- UI RENDERING FUNCTIONS ---
+
+        const scrollToBottom = () => {
+            const list = document.getElementById('message-list');
+            if (list) {
+                list.scrollTop = list.scrollHeight;
             }
-        });
+        };
 
+        const renderMessageList = (messages) => {
+            const list = document.getElementById('message-list');
+            if (!list) return;
 
-        // --- Event Listeners and Initialization ---
+            const shouldScroll = list.scrollTop + list.clientHeight >= list.scrollHeight - 50; // Check if near bottom
 
-        window.onload = initializeAndAuth;
-        
-        if (messageForm) {
-            messageForm.addEventListener('submit', handleSendMessage);
-        }
+            list.innerHTML = messages.map(msg => {
+                const isUser = msg.senderId === userId;
+                // Determine color palette based on sender for M3 Expressive card style
+                const bgColor = isUser ? 'bg-[#494553]' : 'bg-[#292730]'; // Secondary Container vs Surface Container
+                const alignment = isUser ? 'self-end' : 'self-start';
+                const time = msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
 
+                return `
+                    <div class="flex flex-col w-full max-w-xs md:max-w-md ${alignment} mb-3">
+                        <span class="text-xs font-semibold ${isUser ? 'text-right' : 'text-left'} text-gray-400 mb-1">${msg.username || '...'}</span>
+                        <div class="${bgColor} ${isUser ? 'rounded-tl-2xl' : 'rounded-tr-2xl'} rounded-b-2xl p-3 shadow-lg transform transition duration-300 hover:scale-[1.01]">
+                            <p class="text-sm break-words">${msg.text}</p>
+                            <span class="text-xs text-gray-400 mt-1 block ${isUser ? 'text-right' : 'text-left'}">${time}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (shouldScroll) {
+                setTimeout(scrollToBottom, 50); // Ensure scroll after DOM update
+            }
+        };
+
+        // Renders the main chat application interface
+        const renderChatScreen = () => {
+            appDiv.innerHTML = `
+                <!-- Chat Screen Header -->
+                <header class="flex justify-between items-center p-4 rounded-3xl mb-4 bg-surface-container shadow-xl">
+                    <h1 class="text-2xl font-extrabold text-white">Expressive Chat</h1>
+                    <div class="flex items-center space-x-4">
+                         <span class="text-sm text-gray-400 hidden sm:block">User ID: <span class="font-mono text-xs text-primary">${userId}</span></span>
+                         <span class="text-lg font-bold text-primary mr-2">${username}</span>
+                        <button id="signout-button" class="p-2 rounded-full hover:bg-[#3E3847] transition">
+                            <i data-lucide="log-out" class="w-5 h-5 text-red-400"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- Chat Area -->
+                <div class="flex-grow flex flex-col bg-surface-container rounded-3xl shadow-2xl p-4 overflow-hidden">
+                    <!-- Message List -->
+                    <div id="message-list" class="flex-grow overflow-y-auto space-y-2 pb-4">
+                        <div class="text-center text-gray-500 p-8">Loading messages...</div>
+                    </div>
+
+                    <!-- Input Form -->
+                    <form id="message-form" class="flex items-center pt-4 border-t border-gray-700">
+                        <input type="text" id="message-input" placeholder="Type your message..."
+                               class="custom-input flex-grow p-3 mr-4 rounded-xl text-lg bg-[#292730] border border-gray-600 focus:outline-none">
+                        <button type="submit" class="primary-button flex items-center justify-center p-3 rounded-xl shadow-lg">
+                            <i data-lucide="send" class="w-6 h-6"></i>
+                            <span class="ml-2 font-semibold hidden sm:inline">Send</span>
+                        </button>
+                    </form>
+                </div>
+            `;
+
+            // Attach event listeners
+            document.getElementById('signout-button').addEventListener('click', () => signOut(auth));
+            document.getElementById('message-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                sendMessage(document.getElementById('message-input').value);
+            });
+
+            // Start real-time subscription
+            const unsubscribe = subscribeToMessages();
+            // Cleanup function will be useful if we had multiple views
+            return unsubscribe;
+        };
+
+        // Renders the full-screen authentication interface
+        const renderAuthScreen = (mode = 'login', errorMessage = '') => {
+            appDiv.innerHTML = `
+                <div class="flex flex-col items-center justify-center flex-grow">
+                    <!-- M3 Expressive Card -->
+                    <div class="w-full max-w-sm p-8 bg-surface-container rounded-[28px] shadow-2xl transition duration-500 ease-in-out">
+                        <h2 class="text-3xl font-bold text-white text-center mb-6">
+                            ${mode === 'login' ? 'Welcome Back' : 'Create Account'}
+                        </h2>
+
+                        <!-- Error Message -->
+                        ${errorMessage ? `<p class="text-red-400 bg-red-900/30 p-3 rounded-xl mb-4 text-center">${errorMessage}</p>` : ''}
+
+                        <form id="auth-form" class="space-y-4">
+                            <!-- Username Input (For Signup) -->
+                            ${mode === 'signup' ? `
+                                <input type="text" id="auth-username" placeholder="Username (Display Name)" required
+                                       class="custom-input w-full p-3 rounded-xl text-lg bg-[#292730] border border-gray-600 focus:outline-none">
+                            ` : ''}
+
+                            <!-- Email Input -->
+                            <input type="email" id="auth-email" placeholder="Email Address" required
+                                   class="custom-input w-full p-3 rounded-xl text-lg bg-[#292730] border border-gray-600 focus:outline-none">
+
+                            <!-- Password Input (Secret Key) -->
+                            <input type="password" id="auth-password" placeholder="Secret Key (Password)" required
+                                   class="custom-input w-full p-3 rounded-xl text-lg bg-[#292730] border border-gray-600 focus:outline-none">
+
+                            <!-- Submit Button -->
+                            <button type="submit" class="primary-button w-full py-3 mt-6 text-lg font-bold rounded-xl uppercase tracking-wider">
+                                ${mode === 'login' ? 'Login' : 'Sign Up'}
+                            </button>
+                        </form>
+
+                        <!-- Toggle Link -->
+                        <p class="mt-6 text-center text-gray-400">
+                            ${mode === 'login' ? "Don't have an account?" : "Already have an account?"}
+                            <button id="toggle-auth-mode" class="text-primary font-semibold hover:text-white transition">
+                                ${mode === 'login' ? 'Sign Up' : 'Login'}
+                            </button>
+                        </p>
+                    </div>
+                </div>
+            `;
+
+            let currentMode = mode;
+            let currentError = '';
+
+            const authForm = document.getElementById('auth-form');
+            const toggleButton = document.getElementById('toggle-auth-mode');
+
+            toggleButton.addEventListener('click', () => {
+                renderAuthScreen(currentMode === 'login' ? 'signup' : 'login');
+            });
+
+            authForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                currentError = '';
+                const email = document.getElementById('auth-email').value;
+                const password = document.getElementById('auth-password').value;
+                const usernameInput = document.getElementById('auth-username')?.value;
+
+                try {
+                    if (currentMode === 'signup') {
+                        if (!usernameInput) {
+                            currentError = 'Username is required for sign up.';
+                            renderAuthScreen(currentMode, currentError);
+                            return;
+                        }
+                        const userCredential = await fetchWithRetry(() => createUserWithEmailAndPassword(auth, email, password));
+                        // Save username immediately after successful creation
+                        await saveUserProfile(userCredential.user.uid, usernameInput);
+                    } else { // login
+                        await fetchWithRetry(() => signInWithEmailAndPassword(auth, email, password));
+                    }
+                    // onAuthStateChanged will handle the rest
+                } catch (error) {
+                    let friendlyMessage = 'An unknown error occurred.';
+                    if (error.code) {
+                        switch (error.code) {
+                            case 'auth/email-already-in-use': friendlyMessage = 'This email is already registered. Try logging in.'; break;
+                            case 'auth/invalid-email': friendlyMessage = 'The email address is not valid.'; break;
+                            case 'auth/weak-password': friendlyMessage = 'The secret key is too weak (min 6 characters).'; break;
+                            case 'auth/user-not-found':
+                            case 'auth/wrong-password': friendlyMessage = 'Invalid credentials. Please check your email and secret key.'; break;
+                            default: friendlyMessage = error.message;
+                        }
+                    }
+                    console.error("Auth Error:", error);
+                    renderAuthScreen(currentMode, friendlyMessage);
+                }
+            });
+
+            // Re-run lucide replacement for icons
+            lucide.createIcons();
+        };
+
+        // --- MAIN RENDER LOOP ---
+
+        let currentUnsubscribe = null;
+
+        const renderApp = () => {
+            // Cleanup previous subscription if it exists
+            if (currentUnsubscribe) {
+                currentUnsubscribe();
+                currentUnsubscribe = null;
+            }
+
+            if (!isAuthReady) {
+                appDiv.innerHTML = '<div class="text-center p-10 text-xl text-gray-500">Initializing Authentication...</div>';
+            } else if (userId && username) {
+                // User is logged in and has a profile
+                currentUnsubscribe = renderChatScreen();
+            } else {
+                // User is not logged in or profile is missing (anonymous sign-in is not considered logged in here)
+                renderAuthScreen('login');
+            }
+            // Re-run lucide replacement for icons in the newly rendered view
+            lucide.createIcons();
+        };
+
+        // Initial render call (will be refined by onAuthStateChanged)
+        renderApp();
     </script>
 </body>
 </html>
