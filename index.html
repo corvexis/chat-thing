@@ -3,37 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Chat (Supabase)</title>
+    <title>Authenticated Chat (Supabase)</title>
     <!-- Tailwind CSS CDN (For development/single-file environments) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Custom styles for chat scroll and input */
         #chat-container {
-            height: calc(100vh - 16rem); /* Adjust height for full view */
+            height: calc(100vh - 18rem); /* Adjust height for full view */
             overflow-y: auto;
             scroll-behavior: smooth;
         }
     </style>
 </head>
 <!-- DARK MODE: Body background and text color -->
-<body class="bg-gray-900 flex flex-col h-screen antialiased text-gray-100">
+<body class="bg-gray-900 flex flex-col h-screen antialiased text-gray-100 font-sans">
 
     <div class="flex flex-col flex-auto h-full p-6">
         <!-- Main container background -->
         <div class="flex flex-col flex-auto flex-shrink-0 rounded-2xl bg-gray-800 p-4 shadow-xl h-full">
-            <!-- Title text and border color -->
-            <h1 class="text-2xl font-bold text-teal-400 mb-4 border-b border-gray-700 pb-2">Public Chat Room (Supabase)</h1>
 
-            <div class="flex flex-col h-full overflow-hidden">
-                <!-- User Status Header -->
-                <!-- Status bar colors -->
-                <div id="user-status" class="flex justify-between items-center text-sm font-medium text-gray-400 mb-4 p-2 bg-teal-900/30 rounded-lg">
-                    <span>Status: <span id="auth-status" class="text-red-400">Connecting...</span></span>
-                    <span id="current-user-id" class="truncate max-w-[200px] md:max-w-full"></span>
+            <!-- Title and Auth Status Bar -->
+            <div class="border-b border-gray-700 pb-2 mb-4 flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-teal-400">Authenticated Chat Room</h1>
+                <div id="user-status" class="flex items-center text-sm font-medium text-gray-400 p-2 bg-teal-900/30 rounded-lg">
+                    <span id="auth-status" class="text-red-400 mr-2">Connecting...</span>
+                    <button id="logout-button" onclick="handleLogout()"
+                        class="hidden bg-red-600 hover:bg-red-700 text-white text-xs font-semibold py-1 px-3 rounded-md transition duration-200">
+                        Logout
+                    </button>
                 </div>
+            </div>
+
+            <!-- ---------------------------------------------------- -->
+            <!-- AUTHENTICATION SCREEN -->
+            <!-- ---------------------------------------------------- -->
+            <div id="auth-screen" class="flex flex-col items-center justify-center h-full space-y-4">
+                <div class="bg-gray-700 p-8 rounded-xl shadow-lg w-full max-w-md">
+                    <h2 class="text-xl font-bold mb-4 text-center text-white">Login / Sign Up</h2>
+                    <input type="email" id="auth-email" placeholder="Email (Username)"
+                        class="w-full mb-3 p-3 rounded-lg bg-gray-900 border border-gray-600 focus:ring-teal-500 focus:border-teal-500 text-gray-100" />
+                    <input type="password" id="auth-password" placeholder="Password"
+                        class="w-full mb-4 p-3 rounded-lg bg-gray-900 border border-gray-600 focus:ring-teal-500 focus:border-teal-500 text-gray-100" />
+                    
+                    <button onclick="handleAuth('login')"
+                        class="w-full mb-2 p-3 bg-teal-600 hover:bg-teal-500 rounded-xl text-white font-semibold transition duration-200">
+                        Log In
+                    </button>
+                    <button onclick="handleAuth('signup')"
+                        class="w-full p-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white font-semibold transition duration-200">
+                        Sign Up
+                    </button>
+
+                    <p id="auth-message" class="text-center mt-4 text-sm text-yellow-400"></p>
+                </div>
+            </div>
+
+            <!-- ---------------------------------------------------- -->
+            <!-- CHAT SCREEN (Hidden until logged in) -->
+            <!-- ---------------------------------------------------- -->
+            <div id="chat-screen" class="flex flex-col h-full overflow-hidden hidden">
+
+                <span id="current-user-id" class="text-sm font-mono text-gray-500 mb-2 truncate"></span>
 
                 <!-- Chat Messages Container -->
-                <!-- Chat container background -->
                 <div id="chat-container" class="flex flex-col h-full mb-4 space-y-4 p-4 bg-gray-900 rounded-xl">
                     <div id="message-list" class="flex flex-col space-y-4">
                         <!-- Messages will be injected here -->
@@ -44,7 +76,6 @@
                 <div class="flex flex-row items-center border-t border-gray-700 pt-4">
                     <div class="flex-grow ml-4">
                         <div class="relative w-full">
-                            <!-- Input field background and border color -->
                             <input type="text" id="message-input" placeholder="Type your message..."
                                 class="flex w-full border border-gray-700 bg-gray-700 text-gray-100 rounded-xl focus:outline-none focus:border-teal-500 pl-4 h-12 transition duration-200"
                                 onkeypress="if(event.keyCode === 13) sendMessage()" />
@@ -52,8 +83,7 @@
                     </div>
                     <div class="ml-4">
                         <button id="send-button" onclick="sendMessage()"
-                            class="flex items-center justify-center bg-teal-600 hover:bg-teal-500 rounded-xl text-white px-4 py-3 flex-shrink-0 transition duration-300 shadow-md disabled:opacity-50"
-                            disabled>
+                            class="flex items-center justify-center bg-teal-600 hover:bg-teal-500 rounded-xl text-white px-4 py-3 flex-shrink-0 transition duration-300 shadow-md">
                             <span class="font-semibold">Send</span>
                             <svg class="ml-2 w-4 h-4 transform rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
@@ -66,9 +96,6 @@
     </div>
 
     <script type="module">
-        // NOTE: While Firestore is preferred for persistent storage, localStorage is used here
-        // to manage the anonymous user ID for simple chat applications.
-
         // --- Supabase Client Import ---
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.0/+esm'
 
@@ -76,21 +103,27 @@
         const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4'; 
         const MESSAGES_TABLE_NAME = 'messages'; 
-        const USER_ID_KEY = 'chat_user_id'; // localStorage key for user persistence
 
         let supabaseClient;
-        let userId;
+        let userId = null;
+        let realTimeChannel = null;
 
-        const chatContainer = document.getElementById('chat-container');
+        // UI Elements
+        const authScreen = document.getElementById('auth-screen');
+        const chatScreen = document.getElementById('chat-screen');
+        const authMessage = document.getElementById('auth-message');
+        const authEmail = document.getElementById('auth-email');
+        const authPassword = document.getElementById('auth-password');
+        const logoutButton = document.getElementById('logout-button');
         const messageList = document.getElementById('message-list');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const authStatus = document.getElementById('auth-status');
+        const chatContainer = document.getElementById('chat-container');
         const currentUserIdElement = document.getElementById('current-user-id');
+        const authStatus = document.getElementById('auth-status');
+        const messageInput = document.getElementById('message-input');
+
 
         // Function to scroll chat to the bottom
         function scrollToBottom() {
-            // Use a slight delay to ensure the DOM has finished painting the new element
             setTimeout(() => {
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             }, 50);
@@ -98,11 +131,8 @@
 
         /**
          * Creates and returns the HTML element for a single chat message.
-         * @param {object} msg - The message object from Supabase.
-         * @returns {HTMLElement} The styled message div.
          */
         function createMessageElement(msg) {
-            // CRITICAL FIX: The check relies on the persisted userId
             const isMe = msg.sender_id === userId; 
             const messageElement = document.createElement('div');
             messageElement.classList.add('flex', isMe ? 'justify-end' : 'justify-start');
@@ -125,53 +155,87 @@
 
         /**
          * Appends a single message element to the list and scrolls.
-         * @param {object} msg - The message object from Supabase.
          */
         function appendMessage(msg) {
             messageList.appendChild(createMessageElement(msg));
             scrollToBottom();
         }
 
-        // --- Supabase Initialization and Identity ---
-        async function initializeSupabase() {
-            console.log("Initializing Supabase...");
 
-            if (SUPABASE_URL.includes('your-project-ref') || SUPABASE_ANON_KEY.includes('YOUR_ANON_PUBLIC_KEY')) {
-                authStatus.textContent = 'ERROR: Keys Missing';
-                authStatus.classList.replace('text-red-400', 'text-red-700');
-                console.error("Supabase keys are missing. Please replace placeholders with actual project URL and Anon key.");
-                return;
-            }
+        // --- Supabase Auth and Realtime Logic ---
 
-            try {
-                // FIX: Retrieve or generate persistent userId using localStorage
-                let storedId = localStorage.getItem(USER_ID_KEY);
-                if (!storedId) {
-                    storedId = crypto.randomUUID();
-                    localStorage.setItem(USER_ID_KEY, storedId);
-                }
-                userId = storedId;
-                
-                // Initialize client
-                supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                
-                authStatus.textContent = 'Connected (Anon)';
+        function updateAuthState(session) {
+            if (session) {
+                userId = session.user.id;
+                authScreen.classList.add('hidden');
+                chatScreen.classList.remove('hidden');
+                logoutButton.classList.remove('hidden');
+                authStatus.textContent = 'Active';
                 authStatus.classList.replace('text-red-400', 'text-green-400');
                 currentUserIdElement.textContent = `User ID: ${userId}`;
-                sendButton.disabled = false;
-                console.log(`Supabase initialized. Persistent Session User ID: ${userId}`);
                 
-                // Start the listener and fetch history
-                startMessageListener();
+                // Only start listening and fetch history if we are newly authenticated
+                if (!realTimeChannel) {
+                    startMessageListener();
+                }
 
-            } catch (error) {
-                console.error("Supabase Initialization Error:", error);
-                authStatus.textContent = `Init Error: ${error.message}`;
-                authStatus.classList.replace('text-red-400', 'text-red-700');
+            } else {
+                userId = null;
+                authScreen.classList.remove('hidden');
+                chatScreen.classList.add('hidden');
+                logoutButton.classList.add('hidden');
+                authStatus.textContent = 'Logged Out';
+                authStatus.classList.replace('text-green-400', 'text-red-400');
+                currentUserIdElement.textContent = '';
+                messageList.innerHTML = ''; // Clear chat history on logout
+                
+                // Stop the real-time channel if it's active
+                if (realTimeChannel) {
+                    supabaseClient.removeChannel(realTimeChannel);
+                    realTimeChannel = null;
+                }
             }
         }
 
-        // --- Supabase Realtime and Data Fetching ---
+
+        async function handleAuth(type) {
+            const email = authEmail.value.trim();
+            const password = authPassword.value.trim();
+
+            if (!email || !password) {
+                authMessage.textContent = "Email and Password are required.";
+                return;
+            }
+
+            authMessage.textContent = 'Processing...';
+
+            let error;
+            if (type === 'signup') {
+                const { error: signUpError } = await supabaseClient.auth.signUp({ email, password });
+                error = signUpError;
+            } else {
+                const { error: signInError } = await supabaseClient.auth.signInWithPassword({ email, password });
+                error = signInError;
+            }
+
+            if (error) {
+                authMessage.textContent = `Error: ${error.message}`;
+            } else if (type === 'signup') {
+                authMessage.textContent = "Sign up successful! Please check your email for a confirmation link (if required by Supabase).";
+            } else {
+                authMessage.textContent = "Login successful!";
+            }
+        }
+
+        window.handleLogout = async function() {
+            const { error } = await supabaseClient.auth.signOut();
+            if (error) {
+                console.error("Logout error:", error);
+            } else {
+                authMessage.textContent = "Successfully logged out.";
+            }
+        }
+
 
         async function fetchInitialMessages() {
              const { data, error } = await supabaseClient
@@ -186,22 +250,23 @@
             return data;
         }
 
-        async function startMessageListener() {
+        function startMessageListener() {
             console.log(`Starting listener on table: ${MESSAGES_TABLE_NAME}`);
             
             // 1. Fetch initial messages and render them
-            const initialMessages = await fetchInitialMessages();
-            messageList.innerHTML = ''; // Clear previous messages
-            const fragment = document.createDocumentFragment();
-            initialMessages.forEach(msg => {
-                fragment.appendChild(createMessageElement(msg));
+            fetchInitialMessages().then(initialMessages => {
+                messageList.innerHTML = ''; 
+                const fragment = document.createDocumentFragment();
+                initialMessages.forEach(msg => {
+                    fragment.appendChild(createMessageElement(msg));
+                });
+                messageList.appendChild(fragment);
+                scrollToBottom();
             });
-            messageList.appendChild(fragment);
-            scrollToBottom();
 
 
             // 2. Set up Realtime subscription for INSERTS
-            supabaseClient
+            realTimeChannel = supabaseClient
                 .channel('public-chat')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
                     console.log('Realtime message received:', payload);
@@ -213,13 +278,13 @@
                         return;
                     }
 
-                    // FIX: Prevent double display for the sender by checking the persistent ID
+                    // Prevent double display for the sender (who already appended the message locally)
                     if (newMessage.sender_id === userId) {
                         console.log('Ignoring own message from Realtime event (already appended locally).');
                         return; 
                     }
                     
-                    // CRITICAL FIX: Append the new message for all other clients (receivers)
+                    // Append the new message for all other clients (receivers)
                     console.log('Appending new message from remote user.');
                     appendMessage(newMessage);
 
@@ -237,12 +302,10 @@
             const text = messageInput.value.trim();
             if (text === "" || !userId || !supabaseClient) return;
 
-            sendButton.disabled = true;
-
             // Construct the message object to send
             const messageToSend = {
                 text: text,
-                sender_id: userId, // Uses the persistent ID
+                sender_id: userId, 
             };
 
             try {
@@ -257,8 +320,7 @@
                     throw new Error(error.message);
                 }
                 
-                // CRITICAL FIX: Append the message immediately using the returned data (which includes created_at)
-                // This message will be correctly aligned because 'data.sender_id' will match the persistent 'userId'
+                // Append the message immediately
                 appendMessage(data); 
 
                 messageInput.value = '';
@@ -266,11 +328,33 @@
 
             } catch (error) {
                 console.error("Error sending message:", error);
-                console.error(`Failed to send message: ${error.message}`); 
-            } finally {
-                sendButton.disabled = false;
+                // Display error to user
+                alert('Error sending message. Check console for details.'); 
             }
         }
+
+        function initializeSupabase() {
+            console.log("Initializing Supabase client...");
+
+            if (SUPABASE_URL.includes('your-project-ref') || SUPABASE_ANON_KEY.includes('YOUR_ANON_PUBLIC_KEY')) {
+                authStatus.textContent = 'ERROR: Keys Missing';
+                authStatus.classList.replace('text-red-400', 'text-red-700');
+                console.error("Supabase keys are missing. Please replace placeholders with actual project URL and Anon key.");
+                return;
+            }
+
+            // Initialize client
+            supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            
+            // Set up Auth Listener
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                console.log('Supabase Auth Event:', event);
+                updateAuthState(session);
+            });
+            
+            console.log("Supabase client initialized.");
+        }
+
 
         // Start the application setup
         window.onload = initializeSupabase;
