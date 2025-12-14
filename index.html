@@ -70,11 +70,10 @@
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.0/+esm'
 
         // --- Supabase Configuration (***REPLACE THESE WITH YOUR ACTUAL KEYS***) ---
-        // NOTE: In a real environment, these would be loaded securely from environment variables.
-        const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; // e.g., 'https://abcde12345.supabase.co'
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4'; // e.g., 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+        const SUPABASE_URL = 'https://your-project-ref.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'YOUR_ANON_PUBLIC_KEY'; 
 
-        const MESSAGES_TABLE_NAME = 'messages'; // Ensure you have a table named 'messages' in Supabase
+        const MESSAGES_TABLE_NAME = 'messages'; 
 
         let supabaseClient;
         let userId;
@@ -88,7 +87,45 @@
 
         // Function to scroll chat to the bottom
         function scrollToBottom() {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            // Use a slight delay to ensure the DOM has finished painting the new element
+            setTimeout(() => {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }, 50);
+        }
+
+        /**
+         * Creates and returns the HTML element for a single chat message.
+         * @param {object} msg - The message object from Supabase.
+         * @returns {HTMLElement} The styled message div.
+         */
+        function createMessageElement(msg) {
+            const isMe = msg.sender_id === userId;
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('flex', isMe ? 'justify-end' : 'justify-start');
+
+            const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
+
+            messageElement.innerHTML = `
+                <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-xs md:max-w-md">
+                    <div class="text-xs ${isMe ? 'text-gray-400 mr-2' : 'text-teal-400 ml-2'} font-semibold truncate max-w-[150px] md:max-w-[200px]" title="${msg.sender_id}">
+                        ${isMe ? 'You' : msg.sender_id.substring(0, 10) + '...'}
+                    </div>
+                    <div class="relative ${isMe ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-100 border border-gray-600'} rounded-xl p-4 shadow-md mt-1">
+                        <div>${msg.text}</div>
+                        <div class="text-xs mt-1 pt-1 border-t ${isMe ? 'border-teal-400' : 'border-gray-500'} text-right opacity-75">${time}</div>
+                    </div>
+                </div>
+            `;
+            return messageElement;
+        }
+
+        /**
+         * Appends a single message element to the list and scrolls.
+         * @param {object} msg - The message object from Supabase.
+         */
+        function appendMessage(msg) {
+            messageList.appendChild(createMessageElement(msg));
+            scrollToBottom();
         }
 
         // --- Supabase Initialization and Identity ---
@@ -115,6 +152,7 @@
                 sendButton.disabled = false;
                 console.log(`Supabase initialized. Session User ID: ${userId}`);
                 
+                // Start the listener and fetch history
                 startMessageListener();
 
             } catch (error) {
@@ -130,7 +168,7 @@
              const { data, error } = await supabaseClient
                 .from(MESSAGES_TABLE_NAME)
                 .select('*')
-                .order('created_at', { ascending: true }); // Use 'created_at' which is the standard Supabase timestamp column
+                .order('created_at', { ascending: true }); 
 
             if (error) {
                 console.error("Error fetching initial messages:", error);
@@ -142,19 +180,34 @@
         async function startMessageListener() {
             console.log(`Starting listener on table: ${MESSAGES_TABLE_NAME}`);
             
-            // 1. Fetch initial messages
+            // 1. Fetch initial messages and render them
             const initialMessages = await fetchInitialMessages();
-            renderMessages(initialMessages);
+            messageList.innerHTML = ''; // Clear previous messages
+            const fragment = document.createDocumentFragment();
+            initialMessages.forEach(msg => {
+                fragment.appendChild(createMessageElement(msg));
+            });
+            messageList.appendChild(fragment);
+            scrollToBottom();
 
-            // 2. Set up Realtime subscription
+
+            // 2. Set up Realtime subscription for INSERTS
             supabaseClient
                 .channel('public-chat')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
                     console.log('Realtime message received:', payload);
                     
-                    // We re-fetch all messages to keep the display consistent and handle potential missing records,
-                    // but for performance, a production app would often just append the `payload.new` message.
-                    fetchInitialMessages().then(renderMessages);
+                    const newMessage = payload.new;
+
+                    // FIX: Prevent double display for the sender
+                    if (newMessage.sender_id === userId) {
+                        console.log('Ignoring own message from Realtime event.');
+                        return; // Sender already appended this message locally
+                    }
+
+                    // FIX: Append the new message for all other clients
+                    appendMessage(newMessage);
+
                 })
                 .subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
@@ -171,67 +224,37 @@
 
             sendButton.disabled = true;
 
-            const message = {
+            // Construct the message object to send
+            const messageToSend = {
                 text: text,
-                sender_id: userId, // <-- CORRECT: Uses snake_case to match PostgreSQL table
+                sender_id: userId,
             };
 
             try {
                 // Insert the new message into the table
-                const { error } = await supabaseClient
+                const { data, error } = await supabaseClient
                     .from(MESSAGES_TABLE_NAME)
-                    .insert([message]);
+                    .insert([messageToSend])
+                    // We need to request the inserted data back to get the 'created_at' timestamp
+                    .select() 
+                    .single(); 
 
                 if (error) {
                     throw new Error(error.message);
                 }
                 
+                // FIX: Append the message immediately using the returned data (which includes created_at)
+                appendMessage(data); 
+
                 messageInput.value = '';
-                // The Realtime listener will handle the UI update
+                messageInput.focus();
 
             } catch (error) {
                 console.error("Error sending message:", error);
                 console.error(`Failed to send message: ${error.message}`); 
             } finally {
                 sendButton.disabled = false;
-                messageInput.focus();
             }
-        }
-
-        // --- UI Rendering ---
-
-        function renderMessages(messages) {
-            messageList.innerHTML = ''; // Clear existing messages
-            const fragment = document.createDocumentFragment();
-
-            messages.forEach(msg => {
-                // Accessing using snake_case
-                const isMe = msg.sender_id === userId;
-                const messageElement = document.createElement('div');
-                messageElement.classList.add('flex', isMe ? 'justify-end' : 'justify-start');
-
-                // Supabase uses 'created_at' (ISO string)
-                const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...';
-
-                messageElement.innerHTML = `
-                    <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-xs md:max-w-md">
-                        <!-- Sender text color -->
-                        <div class="text-xs ${isMe ? 'text-gray-400 mr-2' : 'text-teal-400 ml-2'} font-semibold truncate max-w-[150px] md:max-w-[200px]" title="${msg.sender_id}">
-                            ${isMe ? 'You' : msg.sender_id.substring(0, 10) + '...'}
-                        </div>
-                        <!-- Message bubble colors -->
-                        <div class="relative ${isMe ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-100 border border-gray-600'} rounded-xl p-4 shadow-md mt-1">
-                            <div>${msg.text}</div>
-                            <!-- Timestamp border color -->
-                            <div class="text-xs mt-1 pt-1 border-t ${isMe ? 'border-teal-400' : 'border-gray-500'} text-right opacity-75">${time}</div>
-                        </div>
-                    </div>
-                `;
-                fragment.appendChild(messageElement);
-            });
-
-            messageList.appendChild(fragment);
-            scrollToBottom();
         }
 
         // Start the application setup
