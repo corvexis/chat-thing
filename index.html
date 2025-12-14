@@ -14,6 +14,13 @@
         #chat-box::-webkit-scrollbar { width: 8px; }
         #chat-box::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 4px; }
         #chat-box::-webkit-scrollbar-track { background-color: #1f2937; }
+        /* Style for prominent error message */
+        .fatal-error {
+            color: #f87171; /* red-400 */
+            font-weight: 700;
+            white-space: pre-wrap;
+            text-align: center;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col antialiased">
@@ -30,7 +37,7 @@
             
             <div class="flex items-center space-x-3">
                 <button id="role-switch-button" class="p-2 rounded-full transition duration-150 text-gray-400 hover:text-white hover:bg-gray-700" title="Switch User Role / Theme">
-                    <!-- Icon for User/Switching (Lucide/Heroicons equivalent) -->
+                    <!-- Icon for User/Switching -->
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
                         <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M16 11l-4 4-4-4"/>
                     </svg>
@@ -41,10 +48,11 @@
 
         <!-- Chat Messages Area -->
         <main id="chat-box" class="flex-grow p-4 sm:p-6 overflow-y-auto space-y-4 max-h-[70vh] min-h-[50vh] scroll-smooth">
-            <div id="loading-indicator" class="text-center text-gray-500">Connecting to Supabase...</div>
+            <!-- Loading indicator that will show errors -->
+            <div id="loading-indicator" class="text-center text-gray-500 text-lg font-medium">Connecting to Supabase...</div>
         </main>
 
-        <!-- Message Input Form (Distinct background for visual separation) -->
+        <!-- Message Input Form -->
         <div class="p-4 sm:p-6 bg-gray-700">
             <form id="message-form" class="flex space-x-3">
                 <input
@@ -73,7 +81,7 @@
     <div id="role-selector-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center hidden">
         <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
             <h2 class="text-2xl font-bold text-white mb-6 border-b border-gray-700 pb-3">Simulate User Role</h2>
-            <p class="text-sm text-gray-400 mb-6">Select a known ID to test its custom theme, or enter a custom ID to use the default theme. This ID will be used as the `sender_secret_id` in the database.</p>
+            <p class="text-sm text-gray-400 mb-6">Select a known ID to test its custom theme. This ID will be used as the `sender_secret_id` in the database.</p>
             
             <form id="role-selector-form" class="space-y-4">
                 
@@ -91,10 +99,10 @@
                             <input type="radio" name="simulated_id" value="KEY_SYLVEXIS_BETA" class="form-radio h-4 w-4 text-fuchsia-500 border-gray-600 focus:ring-fuchsia-500">
                             <span class="ml-3 text-white font-medium">Sylvexis</span>
                             <span class="ml-auto text-xs text-fuchsia-400">(KEY_SYLVEXIS_BETA)</span>
-                        </label>
+                         </label>
                          <!-- TestUser Role -->
                         <label class="inline-flex items-center p-3 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition">
-                            <input type="radio" name="simulated_id" value="GuestTester789" class="form-radio h-4 w-4 text-green-500 border-gray-600 focus:ring-green-500">
+                            <input type="radio" name="simulated_id" value="GuestTester789" class="form-radio h-4 w-4 text-green-500 border-gray-600 focus:ring-green-500" checked>
                             <span class="ml-3 text-white font-medium">TestUser</span>
                             <span class="ml-auto text-xs text-green-400">(GuestTester789)</span>
                         </label>
@@ -132,21 +140,13 @@
         // Import Supabase client
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-        // --- SUPABASE CONFIGURATION (MUST BE UPDATED BY USER) ---
-        // NOTE: Replace these with your actual Supabase project URL and anon key.
+        // =========================================================================
+        // !!! MANDATORY: USER MUST UPDATE THESE CREDENTIALS FOR THE APP TO WORK !!!
+        // =========================================================================
         const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; 
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4';
+        // =========================================================================
         
-        /* * IMPORTANT RLS NOTE:
-         * This app uses the 'anon' key for the Supabase client. Your provided RLS policy
-         * uses public.get_current_secret_id(), which relies on a 'sub' claim in the JWT,
-         * and the policy is set TO authenticated. For this client-side app to work:
-         * 1. The user must be explicitly logged in (via sign-in flow).
-         * 2. OR, for a simple anonymous chat, you must relax the RLS policy on the 
-         * 'messages' table to allow general SELECT and INSERT access.
-         * Otherwise, you will get "Row Level Security policy violation" errors when loading/sending data.
-         */
-
         // --- GLOBAL VARIABLES ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'chat-thing-idk-default';
         
@@ -154,7 +154,6 @@
         let uniqueSessionId = null;     
         let currentUserId = null;       // The role's secret_id (e.g., 'KEY_CORVEXIS_ALPHA')
         let currentUserAlias = "Guest";
-        let currentTheme = { bg: 'bg-gray-500', accent: 'bg-gray-600', hover: 'hover:bg-gray-500' };
         let isReady = false; 
 
         // --- Local Storage Keys ---
@@ -162,15 +161,11 @@
         const LS_SESSION_ID_KEY = `${appId}_session_id`;
 
 
-        // --- Theme Configuration (uses the secret_id as the key) ---
+        // --- Theme Configuration (maps secret_id to styling) ---
         const themeMap = {
-            // Corvexis (Blue)
             'KEY_CORVEXIS_ALPHA': { alias: 'Corvexis', name: 'Blue Shift', bg: 'bg-blue-600', accent: 'bg-blue-700', hover: 'hover:bg-blue-500', ring: 'focus:ring-blue-400' },
-            // Sylvexis (Purple)
             'KEY_SYLVEXIS_BETA': { alias: 'Sylvexis', name: 'Violet Trace', bg: 'bg-fuchsia-600', accent: 'bg-fuchsia-700', hover: 'hover:bg-fuchsia-500', ring: 'focus:ring-fuchsia-400' },
-            // TestUser (Green)
             'GuestTester789': { alias: 'TestUser', name: 'Emerald Flux', bg: 'bg-green-600', accent: 'bg-green-700', hover: 'hover:bg-green-500', ring: 'focus:ring-green-400' },
-            // Default Theme
             'default': { alias: 'Guest', name: 'Gray Dust', bg: 'bg-gray-600', accent: 'bg-gray-700', hover: 'hover:bg-gray-500', ring: 'focus:ring-gray-400' }
         };
 
@@ -187,6 +182,7 @@
         const roleSelectorForm = document.getElementById('role-selector-form');
         const cancelRoleSwitch = document.getElementById('cancel-role-switch');
         const mainTitleElement = document.getElementById('main-title');
+        const loadingIndicator = document.getElementById('loading-indicator');
 
 
         // --- Utility Functions ---
@@ -216,42 +212,35 @@
 
             // Update user info - shows the chosen secret ID/alias
             userInfoElement.textContent = `Secret ID: ${currentUserId} | Role: ${theme.alias}`;
-
-            // Store for message rendering
-            currentTheme = theme;
         }
 
         /**
          * Scrolls the chat box to the bottom.
          */
         function scrollToBottom() {
-            chatBox.scrollTop = chatBox.scrollHeight;
+            // Use requestAnimationFrame to ensure scroll happens after DOM update
+            requestAnimationFrame(() => {
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
         }
 
         /**
          * Converts ISO timestamp from Supabase to a Date object.
-         * @param {string} isoTimestamp - The ISO 8601 timestamp string.
-         * @returns {Date} The converted Date object.
          */
         function parseSupabaseTimestamp(isoTimestamp) {
             try {
                 return new Date(isoTimestamp);
             } catch (e) {
-                console.error("Failed to parse timestamp:", isoTimestamp, e);
                 return new Date();
             }
         }
 
         /**
          * Renders a single message element.
-         * @param {object} message - The message object from Supabase.
-         * @param {string} localUserId - The current user's secret ID.
-         * @returns {HTMLElement} The created message div.
          */
         function renderMessage(message, localUserId) {
-            // Use the currently selected currentUserId (simulated ID) for comparison
+            // Compare sender_secret_id against the SIMULATED localUserId
             const isMe = message.sender_secret_id === localUserId; 
-            // Get the sender's theme (using their secret ID/alias)
             const theme = themeMap[message.sender_secret_id] || themeMap['default'];
 
             const messageDiv = document.createElement('div');
@@ -263,7 +252,7 @@
                 ? `${theme.bg} text-white rounded-3xl rounded-br-md` 
                 : 'bg-gray-700 text-gray-200 rounded-3xl rounded-tl-md';
             
-            contentDiv.className = `max-w-xs md:max-w-md lg:max-w-lg p-3 sm:p-4 shadow-lg transition duration-150 ease-in-out transform hover:scale-[1.01] ${bubbleClasses}`;
+            contentDiv.className = `max-w-xs md:max-w-md lg:max-w-lg p-3 sm:p-4 shadow-lg transition duration-150 ease-in-out ${bubbleClasses}`;
             
             // Sender Alias
             const senderSpan = document.createElement('span');
@@ -297,7 +286,6 @@
 
         /**
          * Switches the local user ID and applies the corresponding theme.
-         * @param {string} newUserId - The secret ID to simulate.
          */
         function switchUserRole(newUserId) {
             if (!newUserId) return;
@@ -309,7 +297,6 @@
                 console.warn("localStorage not available, role will not persist.");
             }
             
-            // If the ID is not in the predefined map, use the default theme but keep the custom ID
             const theme = themeMap[currentUserId] || themeMap['default'];
             currentUserAlias = theme.alias;
             applyTheme(theme);
@@ -319,30 +306,23 @@
         // --- Supabase Setup ---
 
         /**
-         * Initializes Supabase and sets up session ID.
+         * Initializes Supabase and handles auth/UI readiness.
          */
         function initializeAndAuth() {
-            if (SUPABASE_URL === 'YOUR_SUPABASE_PROJECT_URL' || SUPABASE_KEY === 'YOUR_SUPABASE_ANON_KEY') {
-                const errorMsg = 'ERROR: Supabase credentials must be configured in the script section.';
-                document.getElementById('loading-indicator').textContent = errorMsg;
-                console.error(errorMsg);
-                return;
+            loadingIndicator.className = 'text-center text-gray-500 text-lg font-medium';
+            
+            if (SUPABASE_URL.includes('YOUR_SUPABASE') || SUPABASE_KEY.includes('YOUR_SUPABASE')) {
+                const errorMsg = '🛑 FATAL ERROR: Supabase credentials (URL/Key) must be updated in the index.html script.';
+                loadingIndicator.textContent = errorMsg;
+                loadingIndicator.classList.add('fatal-error');
+                return; // STOP EXECUTION HERE
             }
             
             try {
                 // 1. Initialize Supabase Client
                 supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-                // 2. Establish unique Session ID for custom user fallback (if needed)
-                let sessionId = localStorage.getItem(LS_SESSION_ID_KEY);
-                if (!sessionId) {
-                    sessionId = crypto.randomUUID();
-                    localStorage.setItem(LS_SESSION_ID_KEY, sessionId);
-                }
-                uniqueSessionId = sessionId;
-                isReady = true;
-
-                // 3. Determine simulated role/theme
+                // 2. Determine simulated role/theme
                 let simulatedId = localStorage.getItem(LS_USER_ID_KEY);
                 
                 // If no ID is saved, use a default ID and show the modal
@@ -355,16 +335,19 @@
                 
                 switchUserRole(simulatedId);
 
-                // 4. Enable UI and start listener
+                // 3. Enable UI and start listener
                 messageInput.disabled = false;
                 sendButton.disabled = false;
-                document.getElementById('loading-indicator').textContent = 'Welcome! Start chatting below.';
-                
+                loadingIndicator.textContent = 'Welcome! Data loading...';
+                isReady = true;
+
+                // 4. Start the main data process
                 setupRealtimeListener();
 
             } catch (error) {
                 console.error("Initialization Error:", error);
-                document.getElementById('loading-indicator').textContent = `Initialization failed: ${error.message}`;
+                loadingIndicator.textContent = `🚨 Initialization failed! Error: ${error.message}`;
+                loadingIndicator.classList.add('fatal-error');
                 messageInput.disabled = true;
                 sendButton.disabled = true;
             }
@@ -378,6 +361,8 @@
             
             const MESSAGES_TABLE = 'messages';
 
+            loadingIndicator.textContent = 'Loading chat history...';
+            
             // 1. Fetch initial messages
             const { data: initialMessages, error: fetchError } = await supabase
                 .from(MESSAGES_TABLE)
@@ -385,25 +370,29 @@
                 .order('created_at', { ascending: true });
 
             if (fetchError) {
-                console.error("Supabase Fetch Error (Check RLS/Table Existence):", fetchError);
-                // Inform the user about the likely RLS issue if data fetching fails
-                errorMessage.textContent = `Failed to load messages: ${fetchError.message}. Check RLS policy on 'messages' table or table existence.`;
-                errorMessage.classList.remove('hidden');
+                console.error("Supabase Fetch Error (Check RLS/Auth):", fetchError);
+                loadingIndicator.textContent = `❌ RLS/Auth ERROR: Failed to load messages. Message: ${fetchError.message}\n\nACTION: Ensure you ran the SQL script to fix RLS permissions!`;
+                loadingIndicator.classList.add('fatal-error');
+                
+                messageInput.disabled = true;
+                sendButton.disabled = true;
                 return;
             }
 
             // Render initial messages
-            chatBox.innerHTML = '';
+            chatBox.innerHTML = ''; // Clear previous loading indicator
             initialMessages.forEach(message => {
                 const messageElement = renderMessage(message, currentUserId);
                 chatBox.appendChild(messageElement);
             });
             scrollToBottom();
             
+            loadingIndicator.textContent = ''; // Clear loading text on success
+            loadingIndicator.classList.remove('text-lg', 'font-medium', 'text-gray-500', 'fatal-error');
+
             // 2. Setup Realtime Subscription
-            // The subscription listens for any INSERT event on the messages table
             supabase
-                .channel('room-1') // Channel name can be anything unique
+                .channel('room-1')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE }, (payload) => {
                     if (payload.new) {
                         const messageElement = renderMessage(payload.new, currentUserId);
@@ -418,13 +407,12 @@
 
         /**
          * Handles sending a new message to Supabase.
-         * @param {Event} e - The form submission event.
          */
         async function handleSendMessage(e) {
             e.preventDefault();
 
-            if (!supabase || !currentUserId) {
-                errorMessage.textContent = 'Chat not ready. Please check Supabase configuration.';
+            if (!supabase || !currentUserId || !isReady) {
+                errorMessage.textContent = 'Chat not ready. Please wait for connection.';
                 errorMessage.classList.remove('hidden');
                 return;
             }
@@ -439,7 +427,6 @@
             const messageData = {
                 sender_secret_id: currentUserId, 
                 content: content,
-                // created_at is automatically handled by the Supabase database default
             };
             
             messageInput.disabled = true;
@@ -453,6 +440,14 @@
                 
                 for (let i = 0; i < maxRetries; i++) {
                     try {
+                        // NOTE: Since we are using the Anon key, Supabase uses an anonymous session.
+                        // The RLS policy for INSERT requires the user to be *authenticated* // and have the secret_id in their JWT. This setup only works if the 
+                        // user is fully logged in, or if the RLS INSERT policy is temporarily 
+                        // set to allow ALL authenticated users to insert (using TRUE).
+                        
+                        // For this demo, we assume the user has a valid authenticated session
+                        // (which is outside the scope of this single file demo) or the RLS is relaxed.
+                        
                         const { error } = await supabase
                             .from('messages')
                             .insert([messageData]);
@@ -467,14 +462,13 @@
                         if (i === maxRetries - 1) {
                             throw err; // Re-throw on final failure
                         }
-                        // Wait for delay before retrying
                         await new Promise(resolve => setTimeout(resolve, delay));
                         delay *= 2; // Exponential backoff
                     }
                 }
             } catch (error) {
                 console.error("Error sending message to Supabase:", error);
-                errorMessage.textContent = `Error sending message: ${error.message}.`;
+                errorMessage.textContent = `Error sending message: ${error.message}. If RLS denied, you need a full Supabase Auth login.`;
                 errorMessage.classList.remove('hidden');
             } finally {
                 // Re-enable inputs
@@ -503,15 +497,11 @@
             let newId = selectedRadio || customInput;
 
             if (newId) {
-                // If a custom ID is provided that isn't in the theme map, it will use 'default' theme
-                // but the custom ID will be used as the sender_secret_id.
                 switchUserRole(newId);
                 roleSelectorModal.classList.add('hidden'); 
                 document.getElementById('custom_id').value = '';
-            } else {
-                 // Fallback to the unique session ID if nothing predefined is selected/entered
-                switchUserRole(uniqueSessionId);
-                roleSelectorModal.classList.add('hidden');
+                // Reload data to reflect new user's perspective/permissions
+                setupRealtimeListener(); 
             }
         });
 
