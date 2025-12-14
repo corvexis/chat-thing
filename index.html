@@ -173,8 +173,7 @@
 
             const message = {
                 text: text,
-                senderId: userId,
-                // Supabase automatically handles 'created_at' and 'id' if configured
+                sender_id: userId, // <-- CORRECTED: Use snake_case to match PostgreSQL table
             };
 
             try {
@@ -206,7 +205,8 @@
             const fragment = document.createDocumentFragment();
 
             messages.forEach(msg => {
-                const isMe = msg.senderId === userId;
+                // Accessing using snake_case
+                const isMe = msg.sender_id === userId;
                 const messageElement = document.createElement('div');
                 messageElement.classList.add('flex', isMe ? 'justify-end' : 'justify-start');
 
@@ -216,8 +216,8 @@
                 messageElement.innerHTML = `
                     <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-xs md:max-w-md">
                         <!-- Sender text color -->
-                        <div class="text-xs ${isMe ? 'text-gray-400 mr-2' : 'text-teal-400 ml-2'} font-semibold truncate max-w-[150px] md:max-w-[200px]" title="${msg.senderId}">
-                            ${isMe ? 'You' : msg.senderId.substring(0, 10) + '...'}
+                        <div class="text-xs ${isMe ? 'text-gray-400 mr-2' : 'text-teal-400 ml-2'} font-semibold truncate max-w-[150px] md:max-w-[200px]" title="${msg.sender_id}">
+                            ${isMe ? 'You' : msg.sender_id.substring(0, 10) + '...'}
                         </div>
                         <!-- Message bubble colors -->
                         <div class="relative ${isMe ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-100 border border-gray-600'} rounded-xl p-4 shadow-md mt-1">
