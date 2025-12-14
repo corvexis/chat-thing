@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Authenticated Chat (Supabase)</title>
+    <title>Nexus Chat (Supabase)</title>
     <!-- Tailwind CSS CDN (For development/single-file environments) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -28,12 +28,15 @@
 
             <!-- Title and Auth Status Bar -->
             <div class="border-b border-gray-700 pb-2 mb-4 flex justify-between items-center">
-                <h1 class="text-2xl font-bold text-teal-400">Authenticated Chat Room</h1>
-                <div id="user-status" class="flex items-center text-sm font-medium text-gray-400 p-2 bg-teal-900/30 rounded-lg space-x-3">
+                <!-- Changed Title to Nexus Chat and color to blue -->
+                <h1 class="text-2xl font-bold text-blue-400">Nexus Chat</h1>
+                <div id="user-status" class="flex items-center text-sm font-medium text-gray-400 p-2 bg-blue-900/30 rounded-lg space-x-3">
                     <button id="settings-button" onclick="toggleSettingsModal()"
-                        class="hidden text-white hover:text-teal-300 transition duration-200 focus:outline-none" title="Profile Settings">
-                        <!-- Settings Icon (using inline SVG) -->
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.527.272 1.096.417 1.724.417z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        class="hidden text-white hover:text-blue-300 transition duration-200 focus:outline-none" title="Profile Settings">
+                        <!-- Hamburger Menu Icon (3 horizontal lines) -->
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
                     </button>
                     <span id="auth-status" class="text-red-400">Connecting...</span>
                     <button id="logout-button" onclick="handleLogout()"
@@ -50,12 +53,12 @@
                 <div class="bg-gray-700 p-8 rounded-xl shadow-lg w-full max-w-md">
                     <h2 class="text-xl font-bold mb-4 text-center text-white">Login / Sign Up</h2>
                     <input type="email" id="auth-email" placeholder="Email (Username)"
-                        class="w-full mb-3 p-3 rounded-lg bg-gray-900 border border-gray-600 focus:ring-teal-500 focus:border-teal-500 text-gray-100" />
+                        class="w-full mb-3 p-3 rounded-lg bg-gray-900 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-100" />
                     <input type="password" id="auth-password" placeholder="Password"
-                        class="w-full mb-4 p-3 rounded-lg bg-gray-900 border border-gray-600 focus:ring-teal-500 focus:border-teal-500 text-gray-100" />
+                        class="w-full mb-4 p-3 rounded-lg bg-gray-900 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-100" />
                     
                     <button onclick="handleAuth('login')"
-                        class="w-full mb-2 p-3 bg-teal-600 hover:bg-teal-500 rounded-xl text-white font-semibold transition duration-200">
+                        class="w-full mb-2 p-3 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold transition duration-200">
                         Log In
                     </button>
                     <button onclick="handleAuth('signup')"
@@ -86,13 +89,13 @@
                     <div class="flex-grow ml-4">
                         <div class="relative w-full">
                             <input type="text" id="message-input" placeholder="Type your message..."
-                                class="flex w-full border border-gray-700 bg-gray-700 text-gray-100 rounded-xl focus:outline-none focus:border-teal-500 pl-4 h-12 transition duration-200"
+                                class="flex w-full border border-gray-700 bg-gray-700 text-gray-100 rounded-xl focus:outline-none focus:border-blue-500 pl-4 h-12 transition duration-200"
                                 onkeypress="if(event.keyCode === 13) sendMessage()" />
                         </div>
                     </div>
                     <div class="ml-4">
                         <button id="send-button" onclick="sendMessage()"
-                            class="flex items-center justify-center bg-teal-600 hover:bg-teal-500 rounded-xl text-white px-4 py-3 flex-shrink-0 transition duration-300 shadow-md">
+                            class="flex items-center justify-center bg-blue-600 hover:bg-blue-500 rounded-xl text-white px-4 py-3 flex-shrink-0 transition duration-300 shadow-md">
                             <span class="font-semibold">Send</span>
                             <svg class="ml-2 w-4 h-4 transform rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
@@ -109,28 +112,29 @@
     <!-- ---------------------------------------------------- -->
     <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
         <div class="bg-gray-800 rounded-xl p-8 shadow-2xl w-full max-w-lg mx-4 border border-gray-700 transform transition-all duration-300 scale-95 opacity-0">
-            <h2 class="text-2xl font-bold mb-6 text-teal-400 border-b border-gray-700 pb-2">User Profile Settings</h2>
+            <h2 class="text-2xl font-bold mb-6 text-blue-400 border-b border-gray-700 pb-2">User Profile Settings</h2>
             
             <div class="flex flex-col items-center space-y-4 mb-6">
+                <!-- Updated placeholder color from teal to blue hex (3B82F6) -->
                 <img id="profile-avatar-display" 
-                    class="w-20 h-20 rounded-full object-cover border-4 border-teal-500"
-                    src="https://placehold.co/80x80/10B981/ffffff?text=U" 
+                    class="w-20 h-20 rounded-full object-cover border-4 border-blue-500"
+                    src="https://placehold.co/80x80/3B82F6/ffffff?text=U" 
                     alt="User Avatar"
-                    onerror="this.onerror=null;this.src='https://placehold.co/80x80/10B981/ffffff?text=U';"/>
+                    onerror="this.onerror=null;this.src='https://placehold.co/80x80/3B82F6/ffffff?text=U';"/>
                 <p class="text-sm text-gray-400">Your profile will be visible to others.</p>
             </div>
 
             <div class="mb-4">
                 <label for="profile-username-input" class="block text-sm font-medium text-gray-300 mb-1">Username (Display Name)</label>
                 <input type="text" id="profile-username-input" placeholder="e.g., ChatMaster21"
-                    class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:ring-teal-500 focus:border-teal-500 text-gray-100" maxlength="30" />
+                    class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-100" maxlength="30" />
             </div>
 
             <div class="mb-6">
                 <label for="profile-avatar-input" class="block text-sm font-medium text-gray-300 mb-1">Avatar URL (Image Link)</label>
                 <input type="url" id="profile-avatar-input" placeholder="https://..."
-                    class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:ring-teal-500 focus:border-teal-500 text-gray-100" 
-                    oninput="document.getElementById('profile-avatar-display').src = this.value || 'https://placehold.co/80x80/10B981/ffffff?text=U';" />
+                    class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-100" 
+                    oninput="document.getElementById('profile-avatar-display').src = this.value || 'https://placehold.co/80x80/3B82F6/ffffff?text=U';" />
             </div>
 
             <p id="profile-message" class="text-center mt-4 text-sm text-yellow-400 mb-4"></p>
@@ -141,7 +145,7 @@
                     Cancel
                 </button>
                 <button onclick="handleSaveProfile()"
-                    class="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-xl transition duration-200">
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition duration-200">
                     Save Profile
                 </button>
             </div>
@@ -221,7 +225,8 @@
          */
         function updateProfileUI() {
             const currentProfile = userProfiles[userId] || {};
-            const defaultAvatar = 'https://placehold.co/80x80/10B981/ffffff?text=U';
+            // Updated placeholder color hex
+            const defaultAvatar = 'https://placehold.co/80x80/3B82F6/ffffff?text=U';
             
             profileUsernameInput.value = currentProfile.username || '';
             profileAvatarInput.value = currentProfile.avatar_url || '';
@@ -313,8 +318,8 @@
             // Use username from cache, fallback to truncated UID
             const senderName = senderProfile.username || (msg.sender_id ? msg.sender_id.substring(0, 8) + '...' : 'Unknown');
             
-            // Use avatar from cache, fallback to placeholder
-            const avatarUrl = senderProfile.avatar_url || 'https://placehold.co/40x40/10B981/ffffff?text=U';
+            // Use avatar from cache, fallback to placeholder (Updated placeholder color hex)
+            const avatarUrl = senderProfile.avatar_url || 'https://placehold.co/40x40/3B82F6/ffffff?text=U';
 
             const messageElement = document.createElement('div');
             messageElement.classList.add('flex', isMe ? 'justify-end' : 'justify-start');
@@ -326,7 +331,7 @@
             messageElement.innerHTML = `
                 <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-xs md:max-w-md">
                     <!-- Display Username instead of UID on top of the message -->
-                    <div class="text-xs ${isMe ? 'text-gray-400 mr-2' : 'text-teal-400 ml-2'} font-semibold truncate max-w-[150px] md:max-w-[200px]" title="${msg.sender_id}">
+                    <div class="text-xs ${isMe ? 'text-gray-400 mr-2' : 'text-blue-400 ml-2'} font-semibold truncate max-w-[150px] md:max-w-[200px]" title="${msg.sender_id}">
                         ${senderName}
                     </div>
                     
@@ -335,12 +340,12 @@
                         <img class="w-8 h-8 rounded-full object-cover border border-gray-600" 
                             src="${avatarUrl}" 
                             alt="${senderName}"
-                            onerror="this.onerror=null;this.src='https://placehold.co/40x40/10B981/ffffff?text=U';" />
+                            onerror="this.onerror=null;this.src='https://placehold.co/40x40/3B82F6/ffffff?text=U';" />
 
                         <!-- Message Bubble -->
-                        <div class="relative ${isMe ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-100 border border-gray-600'} rounded-xl p-3 shadow-md">
+                        <div class="relative ${isMe ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-100 border border-gray-600'} rounded-xl p-3 shadow-md">
                             <div>${msg.text}</div>
-                            <div class="text-xs mt-1 pt-1 border-t ${isMe ? 'border-teal-400' : 'border-gray-500'} text-right opacity-75">${time}</div>
+                            <div class="text-xs mt-1 pt-1 border-t ${isMe ? 'border-blue-400' : 'border-gray-500'} text-right opacity-75">${time}</div>
                         </div>
                     </div>
                 </div>
