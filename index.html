@@ -92,13 +92,6 @@
 
                 <span id="current-user-id" class="text-sm font-mono text-gray-500 mb-2 truncate"></span>
                 
-                <!-- Search Input Field (NEW) -->
-                <div class="mb-3">
-                    <input type="text" id="search-input" placeholder="Search messages or users..."
-                        class="w-full p-3 rounded-xl bg-gray-700 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
-                        oninput="handleSearchInput()">
-                </div>
-                
                 <!-- Chat Messages Container -->
                 <div id="chat-container" class="flex flex-col flex-grow mb-4 space-y-4 p-4 bg-gray-900 rounded-xl">
                     <div id="message-list" class="flex flex-col space-y-4">
@@ -108,6 +101,13 @@
 
                 <!-- Message Input -->
                 <div class="flex flex-col border-t border-gray-700 pt-4">
+
+                    <!-- Search Input Field (Toggled by Button) -->
+                    <div id="search-input-container" class="mb-3 hidden">
+                        <input type="text" id="search-input" placeholder="Search messages or users..."
+                            class="w-full p-3 rounded-xl bg-gray-700 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
+                            oninput="handleSearchInput()">
+                    </div>
 
                     <!-- Image Preview Area -->
                     <div id="image-preview-container" class="hidden relative p-3 mb-2 bg-gray-700 rounded-xl border border-blue-600">
@@ -141,6 +141,15 @@
                                     class="flex w-full border border-gray-700 bg-gray-700 text-gray-100 rounded-xl focus:outline-none focus:border-blue-500 pl-4 h-12 transition duration-200"
                                     onkeypress="if(event.keyCode === 13) sendMessage()" />
                             </div>
+                        </div>
+                        
+                        <!-- Search Toggle Button (NEW) -->
+                        <div class="ml-2">
+                            <button id="search-toggle-btn" onclick="toggleSearchInput()"
+                                class="flex items-center justify-center p-3 bg-gray-600 hover:bg-gray-500 rounded-xl text-white flex-shrink-0 transition duration-300 shadow-md"
+                                title="Toggle Search">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                            </button>
                         </div>
                         
                         <!-- Send Button -->
@@ -307,6 +316,7 @@
         // JS State Variables for Editing and Filtering
         let allMessages = []; // To store all messages for filtering/searching
         let isEditingMessageId = null; // Track message currently being edited
+        let isSearchActive = false; // NEW: State to track search input visibility
 
         // UI Elements
         const authScreen = document.getElementById('auth-screen');
@@ -321,8 +331,10 @@
         const settingsModal = document.getElementById('settings-modal');
         const settingsButton = document.getElementById('settings-button');
         
-        // Search Input
+        // Search Elements (UPDATED)
+        const searchInputContainer = document.getElementById('search-input-container'); // NEW
         const searchInput = document.getElementById('search-input');
+        const searchToggleBtn = document.getElementById('search-toggle-btn'); // NEW
 
         // Media UI elements
         const mediaInput = document.getElementById('media-input');
@@ -704,7 +716,7 @@
         }
 
 
-        // --- Message Searching/Filtering Logic (NEW) ---
+        // --- Message Searching/Filtering Logic (UPDATED) ---
 
         async function fetchInitialMessages() {
              const { data, error } = await supabaseClient
@@ -750,6 +762,24 @@
             }
             
             renderMessages(filteredMessages);
+        }
+        
+        // NEW: Function to toggle search input visibility
+        window.toggleSearchInput = function() {
+            isSearchActive = !isSearchActive;
+
+            if (isSearchActive) {
+                searchInputContainer.classList.remove('hidden');
+                searchInput.focus();
+                searchToggleBtn.classList.replace('bg-gray-600', 'bg-blue-600');
+                searchToggleBtn.classList.add('ring-2', 'ring-blue-400');
+            } else {
+                searchInputContainer.classList.add('hidden');
+                searchInput.value = ''; // Clear search
+                handleSearchInput(); // Rerender full list
+                searchToggleBtn.classList.replace('bg-blue-600', 'bg-gray-600');
+                searchToggleBtn.classList.remove('ring-2', 'ring-blue-400');
+            }
         }
         
         
