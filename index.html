@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Chat (Supabase)</title>
+    <title>Nexus Chat</title>
     <!-- Tailwind CSS CDN (For development/single-file environments) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -28,7 +28,6 @@
 
             <!-- Title and Auth Status Bar -->
             <div class="border-b border-gray-700 pb-2 mb-4 flex justify-between items-center">
-                <!-- Changed Title to Nexus Chat and color to blue -->
                 <h1 class="text-2xl font-bold text-blue-400">Nexus Chat</h1>
                 <div id="user-status" class="flex items-center text-sm font-medium text-gray-400 p-2 bg-blue-900/30 rounded-lg space-x-3">
                     <button id="settings-button" onclick="toggleSettingsModal()"
@@ -85,22 +84,45 @@
                 </div>
 
                 <!-- Message Input -->
-                <div class="flex flex-row items-center border-t border-gray-700 pt-4">
-                    <div class="flex-grow ml-4">
-                        <div class="relative w-full">
-                            <input type="text" id="message-input" placeholder="Type your message..."
-                                class="flex w-full border border-gray-700 bg-gray-700 text-gray-100 rounded-xl focus:outline-none focus:border-blue-500 pl-4 h-12 transition duration-200"
-                                onkeypress="if(event.keyCode === 13) sendMessage()" />
-                        </div>
-                    </div>
-                    <div class="ml-4">
-                        <button id="send-button" onclick="sendMessage()"
-                            class="flex items-center justify-center bg-blue-600 hover:bg-blue-500 rounded-xl text-white px-4 py-3 flex-shrink-0 transition duration-300 shadow-md">
-                            <span class="font-semibold">Send</span>
-                            <svg class="ml-2 w-4 h-4 transform rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                            </svg>
+                <div class="flex flex-col border-t border-gray-700 pt-4">
+
+                    <!-- Image Preview Area -->
+                    <div id="image-preview-container" class="hidden relative p-3 mb-2 bg-gray-700 rounded-xl border border-blue-600">
+                        <img id="image-preview" class="max-h-40 max-w-full rounded-lg object-contain" src="" alt="Image Preview">
+                        <button onclick="clearImagePreview()" class="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 leading-none shadow-lg">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                         </button>
+                    </div>
+
+                    <!-- Input Controls Row -->
+                    <div class="flex flex-row items-center">
+                        <!-- Image Upload Button -->
+                        <button onclick="document.getElementById('media-input').click()"
+                            class="flex items-center justify-center p-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white mr-3 flex-shrink-0 transition duration-300 shadow-md"
+                            title="Send Photo">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        </button>
+                        <input type="file" id="media-input" accept="image/*" class="hidden" onchange="handleImageSelection(event)">
+                        
+                        <!-- Text Input -->
+                        <div class="flex-grow">
+                            <div class="relative w-full">
+                                <input type="text" id="message-input" placeholder="Type your message..."
+                                    class="flex w-full border border-gray-700 bg-gray-700 text-gray-100 rounded-xl focus:outline-none focus:border-blue-500 pl-4 h-12 transition duration-200"
+                                    onkeypress="if(event.keyCode === 13) sendMessage()" />
+                            </div>
+                        </div>
+                        
+                        <!-- Send Button -->
+                        <div class="ml-4">
+                            <button id="send-button" onclick="sendMessage()"
+                                class="flex items-center justify-center bg-blue-600 hover:bg-blue-500 rounded-xl text-white px-4 py-3 flex-shrink-0 transition duration-300 shadow-md">
+                                <span class="font-semibold">Send</span>
+                                <svg class="ml-2 w-4 h-4 transform rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -115,7 +137,7 @@
             <h2 class="text-2xl font-bold mb-6 text-blue-400 border-b border-gray-700 pb-2">User Profile Settings</h2>
             
             <div class="flex flex-col items-center space-y-4 mb-6">
-                <!-- Updated placeholder color from teal to blue hex (3B82F6) -->
+                <!-- Updated placeholder color to blue hex (3B82F6) -->
                 <img id="profile-avatar-display" 
                     class="w-20 h-20 rounded-full object-cover border-4 border-blue-500"
                     src="https://placehold.co/80x80/3B82F6/ffffff?text=U" 
@@ -161,15 +183,15 @@
         const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4'; 
         const MESSAGES_TABLE_NAME = 'messages'; 
-        // NEW: Table for storing user profiles (username and avatar)
         const PROFILES_TABLE_NAME = 'profiles'; 
 
         let supabaseClient;
         let userId = null;
         let realTimeChannel = null;
-        
-        // NEW: Local cache for user profiles {userId: {username, avatar_url}}
         let userProfiles = {}; 
+        
+        // NEW: Variable to hold the Base64 data of the selected image
+        let pendingMediaBase64 = null; 
 
         // UI Elements
         const authScreen = document.getElementById('auth-screen');
@@ -187,6 +209,11 @@
         const profileAvatarInput = document.getElementById('profile-avatar-input');
         const profileAvatarDisplay = document.getElementById('profile-avatar-display');
 
+        // NEW Media UI elements
+        const mediaInput = document.getElementById('media-input');
+        const imagePreview = document.getElementById('image-preview');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+
 
         /**
          * Function to scroll chat to the bottom.
@@ -196,8 +223,50 @@
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             }, 0); 
         }
+
+        /**
+         * Clears the image preview and media data.
+         */
+        window.clearImagePreview = function() {
+            pendingMediaBase64 = null;
+            mediaInput.value = ''; // Reset file input
+            imagePreview.src = '';
+            imagePreviewContainer.classList.add('hidden');
+            messageInput.focus();
+        }
+
+        /**
+         * Handles image selection, reads the file, and displays the preview.
+         */
+        window.handleImageSelection = function(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                clearImagePreview();
+                return;
+            }
+
+            if (!file.type.startsWith('image/')) {
+                 authMessage.textContent = 'Please select an image file.';
+                 clearImagePreview();
+                 return;
+            }
+            
+            // Read the file as a Data URL (Base64)
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // Store Base64 data to be sent
+                pendingMediaBase64 = e.target.result;
+                // Show preview
+                imagePreview.src = pendingMediaBase64;
+                imagePreviewContainer.classList.remove('hidden');
+                messageInput.focus();
+                // Clear any previous error message
+                authMessage.textContent = '';
+            };
+            reader.readAsDataURL(file);
+        }
         
-        // NEW: Toggle the profile settings modal
+        // Toggle settings modal (kept for completeness)
         window.toggleSettingsModal = function() {
             const modalContent = settingsModal.children[0];
 
@@ -225,7 +294,6 @@
          */
         function updateProfileUI() {
             const currentProfile = userProfiles[userId] || {};
-            // Updated placeholder color hex
             const defaultAvatar = 'https://placehold.co/80x80/3B82F6/ffffff?text=U';
             
             profileUsernameInput.value = currentProfile.username || '';
@@ -284,8 +352,7 @@
                     username: newUsername, 
                     avatar_url: newAvatarUrl || null 
                 }, { onConflict: 'id' }); 
-                // We assume 'id' is the primary key and conflict target
-
+                
             if (error) {
                 profileMessage.textContent = `Error saving profile: ${error.message}. Please ensure the username is unique and RLS is set up.`;
                 console.error("Error saving profile:", error);
@@ -296,13 +363,8 @@
             
             // Update local cache and UI
             userProfiles[userId] = { username: newUsername, avatar_url: newAvatarUrl };
-            
-            // Re-render chat messages to show the new username/avatar immediately
-            // (Only for the local user, remote users will see the change via Realtime if implemented, but here we only handle inserts on Realtime, so a quick history refresh is best).
-            // For simplicity and to reflect the change globally, we refresh the chat history.
             startMessageListener(); 
             
-            // Close modal after a short delay
             setTimeout(() => {
                 toggleSettingsModal();
             }, 1000);
@@ -315,10 +377,7 @@
             const isMe = msg.sender_id === userId; 
             const senderProfile = userProfiles[msg.sender_id] || {};
             
-            // Use username from cache, fallback to truncated UID
             const senderName = senderProfile.username || (msg.sender_id ? msg.sender_id.substring(0, 8) + '...' : 'Unknown');
-            
-            // Use avatar from cache, fallback to placeholder (Updated placeholder color hex)
             const avatarUrl = senderProfile.avatar_url || 'https://placehold.co/40x40/3B82F6/ffffff?text=U';
 
             const messageElement = document.createElement('div');
@@ -326,254 +385,4 @@
 
             const time = msg.created_at 
                 ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-                : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-            messageElement.innerHTML = `
-                <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-xs md:max-w-md">
-                    <!-- Display Username instead of UID on top of the message -->
-                    <div class="text-xs ${isMe ? 'text-gray-400 mr-2' : 'text-blue-400 ml-2'} font-semibold truncate max-w-[150px] md:max-w-[200px]" title="${msg.sender_id}">
-                        ${senderName}
-                    </div>
-                    
-                    <div class="flex ${isMe ? 'flex-row-reverse' : 'flex-row'} items-start mt-1 space-x-2 ${isMe ? 'space-x-reverse' : ''}">
-                        <!-- Avatar -->
-                        <img class="w-8 h-8 rounded-full object-cover border border-gray-600" 
-                            src="${avatarUrl}" 
-                            alt="${senderName}"
-                            onerror="this.onerror=null;this.src='https://placehold.co/40x40/3B82F6/ffffff?text=U';" />
-
-                        <!-- Message Bubble -->
-                        <div class="relative ${isMe ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-100 border border-gray-600'} rounded-xl p-3 shadow-md">
-                            <div>${msg.text}</div>
-                            <div class="text-xs mt-1 pt-1 border-t ${isMe ? 'border-blue-400' : 'border-gray-500'} text-right opacity-75">${time}</div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            return messageElement;
-        }
-
-        /**
-         * Appends a single message element to the list and scrolls.
-         */
-        function appendMessage(msg) {
-            messageList.appendChild(createMessageElement(msg));
-            scrollToBottom();
-        }
-
-
-        // --- Supabase Auth and Realtime Logic ---
-
-        async function updateAuthState(session) {
-            if (session) {
-                userId = session.user.id;
-                authScreen.classList.add('hidden');
-                chatScreen.classList.remove('hidden');
-                logoutButton.classList.remove('hidden');
-                settingsButton.classList.remove('hidden'); // Show settings button
-                authStatus.textContent = 'Active';
-                authStatus.classList.replace('text-red-400', 'text-green-400');
-                
-                // NEW: Fetch all profiles when a user logs in
-                await fetchProfiles(); 
-                updateProfileUI(); // Update UID display and form fields
-
-                // Only start listening and fetch history if we are newly authenticated
-                if (!realTimeChannel) {
-                    startMessageListener();
-                }
-
-            } else {
-                userId = null;
-                authScreen.classList.remove('hidden');
-                chatScreen.classList.add('hidden');
-                logoutButton.classList.add('hidden');
-                settingsButton.classList.add('hidden'); // Hide settings button
-                authStatus.textContent = 'Logged Out';
-                authStatus.classList.replace('text-green-400', 'text-red-400');
-                currentUserIdElement.textContent = '';
-                messageList.innerHTML = ''; // Clear chat history on logout
-                userProfiles = {}; // Clear profile cache
-                
-                // Stop the real-time channel if it's active
-                if (realTimeChannel) {
-                    supabaseClient.removeChannel(realTimeChannel);
-                    realTimeChannel = null;
-                }
-            }
-        }
-
-
-        // FIX: Expose handleAuth to the global window object
-        window.handleAuth = async function(type) {
-            const email = document.getElementById('auth-email').value.trim();
-            const password = document.getElementById('auth-password').value.trim();
-
-            if (!email || !password) {
-                authMessage.textContent = "Email and Password are required.";
-                return;
-            }
-
-            authMessage.textContent = 'Processing...';
-
-            let error;
-            if (type === 'signup') {
-                const { error: signUpError } = await supabaseClient.auth.signUp({ email, password });
-                error = signUpError;
-            } else {
-                const { error: signInError } = await supabaseClient.auth.signInWithPassword({ email, password });
-                error = signInError;
-            }
-
-            if (error) {
-                authMessage.textContent = `Error: ${error.message}`;
-            } else if (type === 'signup') {
-                authMessage.textContent = "Sign up successful! Please check your email for a confirmation link (if required by Supabase).";
-            } else {
-                authMessage.textContent = "Login successful!";
-            }
-        }
-
-        // FIX: Expose handleLogout to the global window object
-        window.handleLogout = async function() {
-            const { error } = await supabaseClient.auth.signOut();
-            if (error) {
-                console.error("Logout error:", error);
-            } else {
-                authMessage.textContent = "Successfully logged out.";
-            }
-        }
-
-
-        async function fetchInitialMessages() {
-             const { data, error } = await supabaseClient
-                .from(MESSAGES_TABLE_NAME)
-                .select('*')
-                .order('created_at', { ascending: true }); 
-
-            if (error) {
-                console.error("Error fetching initial messages:", error);
-                return [];
-            }
-            return data;
-        }
-
-        function startMessageListener() {
-            console.log(`Starting listener on table: ${MESSAGES_TABLE_NAME}`);
-            
-            // 1. Fetch initial messages and render them
-            fetchInitialMessages().then(initialMessages => {
-                messageList.innerHTML = ''; 
-                const fragment = document.createDocumentFragment();
-                initialMessages.forEach(msg => {
-                    fragment.appendChild(createMessageElement(msg));
-                });
-                messageList.appendChild(fragment);
-                scrollToBottom();
-            });
-
-
-            // 2. Set up Realtime subscription for INSERTS
-            realTimeChannel = supabaseClient
-                .channel('public-chat')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
-                    console.log('Realtime message received:', payload);
-                    
-                    const newMessage = payload.new;
-
-                    if (!newMessage || !newMessage.sender_id) {
-                        console.error("Realtime payload missing message data.");
-                        return;
-                    }
-
-                    // Prevent double display for the sender (who already appended the message locally)
-                    if (newMessage.sender_id === userId) {
-                        console.log('Ignoring own message from Realtime event (already appended locally).');
-                        return; 
-                    }
-                    
-                    // Appending the new message for all other clients (receivers)
-                    console.log('RECEIVER: Appending new message from remote user instantly.');
-                    appendMessage(newMessage);
-
-                })
-                .subscribe((status) => {
-                    if (status === 'INITIAL') {
-                         console.log('Supabase Realtime connection established.');
-                    } else if (status === 'SUBSCRIBED') {
-                        console.log('Supabase Realtime subscription active. Waiting for change events...');
-                    } else if (status === 'CHANNEL_ERROR') {
-                        console.error('Supabase Realtime Channel Error. Check network and Supabase console.');
-                    }
-                });
-        }
-
-        // This function is now exposed to the window object
-        window.sendMessage = async function() {
-            const text = messageInput.value.trim();
-            if (text === "" || !userId || !supabaseClient) return;
-
-            // Clear prior error messages
-            authMessage.textContent = ''; 
-            
-            // Construct the message object to send
-            const messageToSend = {
-                text: text,
-                sender_id: userId, 
-            };
-
-            try {
-                // Insert the new message into the table and retrieve the generated row
-                const { data, error } = await supabaseClient
-                    .from(MESSAGES_TABLE_NAME)
-                    .insert([messageToSend])
-                    .select() 
-                    .single(); 
-
-                if (error) {
-                    throw new Error(error.message);
-                }
-                
-                console.log("SENDER: Message successfully inserted and retrieved. Appending locally for instant display:", data);
-                
-                // Append the message immediately for the SENDER
-                appendMessage(data); 
-
-                messageInput.value = '';
-                messageInput.focus();
-
-            } catch (error) {
-                console.error("Error sending message:", error);
-                document.getElementById('auth-message').textContent = 'Error sending message. Check console for details.';
-            }
-        }
-
-        function initializeSupabase() {
-            console.log("Initializing Supabase client...");
-
-            if (SUPABASE_URL.includes('your-project-ref') || SUPABASE_ANON_KEY.includes('YOUR_ANON_PUBLIC_KEY')) {
-                document.getElementById('auth-status').textContent = 'ERROR: Keys Missing';
-                document.getElementById('auth-status').classList.replace('text-red-400', 'text-red-700');
-                console.error("Supabase keys are missing. Please replace placeholders with actual project URL and Anon key.");
-                return;
-            }
-
-            // Initialize client
-            supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            
-            // Set up Auth Listener
-            supabaseClient.auth.onAuthStateChange((event, session) => {
-                console.log('Supabase Auth Event:', event);
-                updateAuthState(session);
-            });
-            
-            console.log("Supabase client initialized.");
-        }
-
-
-        // Start the application setup
-        window.onload = initializeSupabase;
-
-    </script>
-</body>
-</html>
+                : new Date().t
