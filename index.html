@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Chat</title>
+    <title>Nexus Chat (Supabase)</title>
     <!-- Tailwind CSS CDN (For development/single-file environments) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -385,4 +385,289 @@
 
             const time = msg.created_at 
                 ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-                : new Date().t
+                : new ().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            // Determine content
+            let contentHTML = '';
+            if (msg.media_url) {
+                // If media_url exists, display the image
+                // The Base64 image is stored directly in media_url
+                contentHTML = `
+                    <div class="mb-2 rounded-lg overflow-hidden border border-gray-600 shadow-md">
+                        <img src="${msg.media_url}" 
+                             alt="Sent Image" 
+                             class="max-w-xs md:max-w-sm max-h-96 object-contain cursor-pointer"
+                             onclick="window.open(this.src, '_blank')">
+                    </div>
+                    ${msg.text ? `<div class="mt-1">${msg.text}</div>` : ''}
+                `;
+            } else if (msg.text) {
+                // Otherwise, display the text content
+                contentHTML = `<div>${msg.text}</div>`;
+            }
+
+
+            messageElement.innerHTML = `
+                <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-xs md:max-w-md">
+                    <div class="text-xs ${isMe ? 'text-gray-400 mr-2' : 'text-blue-400 ml-2'} font-semibold truncate max-w-[150px] md:max-w-[200px]" title="${msg.sender_id}">
+                        ${senderName}
+                    </div>
+                    
+                    <div class="flex ${isMe ? 'flex-row-reverse' : 'flex-row'} items-start mt-1 space-x-2 ${isMe ? 'space-x-reverse' : ''}">
+                        <!-- Avatar -->
+                        <img class="w-8 h-8 rounded-full object-cover border border-gray-600" 
+                            src="${avatarUrl}" 
+                            alt="${senderName}"
+                            onerror="this.onerror=null;this.src='https://placehold.co/40x40/3B82F6/ffffff?text=U';" />
+
+                        <!-- Message Bubble -->
+                        <div class="relative ${isMe ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-100 border border-gray-600'} rounded-xl p-3 shadow-md">
+                            ${contentHTML}
+                            <div class="text-xs mt-1 pt-1 border-t ${isMe ? 'border-blue-400' : 'border-gray-500'} text-right opacity-75">${time}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return messageElement;
+        }
+
+        /**
+         * Appends a single message element to the list and scrolls.
+         */
+        function appendMessage(msg) {
+            messageList.appendChild(createMessageElement(msg));
+            scrollToBottom();
+        }
+
+
+        // --- Supabase Auth and Realtime Logic ---
+
+        async function updateAuthState(session) {
+            if (session) {
+                userId = session.user.id;
+                authScreen.classList.add('hidden');
+                chatScreen.classList.remove('hidden');
+                logoutButton.classList.remove('hidden');
+                settingsButton.classList.remove('hidden'); // Show settings button
+                authStatus.textContent = 'Active';
+                authStatus.classList.replace('text-red-400', 'text-green-400');
+                
+                await fetchProfiles(); 
+                updateProfileUI(); 
+
+                if (!realTimeChannel) {
+                    startMessageListener();
+                }
+
+            } else {
+                userId = null;
+                authScreen.classList.remove('hidden');
+                chatScreen.classList.add('hidden');
+                logoutButton.classList.add('hidden');
+                settingsButton.classList.add('hidden'); // Hide settings button
+                authStatus.textContent = 'Logged Out';
+                authStatus.classList.replace('text-green-400', 'text-red-400');
+                currentUserIdElement.textContent = '';
+                messageList.innerHTML = ''; 
+                userProfiles = {}; 
+                
+                if (realTimeChannel) {
+                    supabaseClient.removeChannel(realTimeChannel);
+                    realTimeChannel = null;
+                }
+            }
+        }
+
+        // UPDATED: Added error handling to display Supabase error messages on screen
+        window.handleAuth = async function(type) {
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value.trim();
+
+            if (!email || !password) {
+                authMessage.textContent = "Email and Password are required.";
+                return;
+            }
+
+            authMessage.textContent = 'Processing...';
+
+            let response;
+            if (type === 'signup') {
+                response = await supabaseClient.auth.signUp({ email, password });
+            } else {
+                response = await supabaseClient.auth.signInWithPassword({ email, password });
+            }
+
+            const { error } = response;
+
+            if (error) {
+                console.error(`Supabase Auth Error (${type}):`, error);
+                // Display the specific error message from Supabase to help diagnose
+                authMessage.textContent = `Error: ${error.message}. Please check your credentials, email confirmation status, and Supabase RLS policies.`;
+            } else if (type === 'signup') {
+                // Check for session in response to see if immediate sign-in happened
+                if (response.data.session) {
+                    authMessage.textContent = "Sign up successful and logged in!";
+                } else {
+                    authMessage.textContent = "Sign up successful! Please check your email for a confirmation link (if required by Supabase).";
+                }
+            } else {
+                authMessage.textContent = "Login successful!";
+            }
+        }
+
+        window.handleLogout = async function() {
+            const { error } = await supabaseClient.auth.signOut();
+            if (error) {
+                console.error("Logout error:", error);
+            } else {
+                authMessage.textContent = "Successfully logged out.";
+            }
+        }
+
+
+        async function fetchInitialMessages() {
+             const { data, error } = await supabaseClient
+                .from(MESSAGES_TABLE_NAME)
+                .select('*')
+                .order('created_at', { ascending: true }); 
+
+            if (error) {
+                console.error("Error fetching initial messages:", error);
+                return [];
+            }
+            return data;
+        }
+
+        function startMessageListener() {
+            console.log(`Starting listener on table: ${MESSAGES_TABLE_NAME}`);
+            
+            // 1. Fetch initial messages and render them
+            fetchInitialMessages().then(initialMessages => {
+                messageList.innerHTML = ''; 
+                const fragment = document.createDocumentFragment();
+                initialMessages.forEach(msg => {
+                    fragment.appendChild(createMessageElement(msg));
+                });
+                messageList.appendChild(fragment);
+                scrollToBottom();
+            });
+
+
+            // 2. Set up Realtime subscription for INSERTS
+            realTimeChannel = supabaseClient
+                .channel('public-chat')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
+                    console.log('Realtime message received:', payload);
+                    
+                    const newMessage = payload.new;
+
+                    if (!newMessage || !newMessage.sender_id) {
+                        console.error("Realtime payload missing message data.");
+                        return;
+                    }
+
+                    if (newMessage.sender_id === userId) {
+                        console.log('Ignoring own message from Realtime event (already appended locally).');
+                        return; 
+                    }
+                    
+                    console.log('RECEIVER: Appending new message from remote user instantly.');
+                    appendMessage(newMessage);
+
+                })
+                .subscribe((status) => {
+                    if (status === 'INITIAL') {
+                         console.log('Supabase Realtime connection established.');
+                    } else if (status === 'SUBSCRIBED') {
+                        console.log('Supabase Realtime subscription active. Waiting for change events...');
+                    } else if (status === 'CHANNEL_ERROR') {
+                        console.error('Supabase Realtime Channel Error. Check network and Supabase console.');
+                    }
+                });
+        }
+
+        // Updated sendMessage function to handle text OR media
+        window.sendMessage = async function() {
+            const text = messageInput.value.trim();
+            const mediaUrl = pendingMediaBase64; 
+
+            // Check if both fields are empty
+            if (text === "" && !mediaUrl || !userId || !supabaseClient) {
+                 authMessage.textContent = "Please type a message or select an image.";
+                 return;
+            }
+
+            // Clear prior error messages
+            authMessage.textContent = ''; 
+            
+            // Construct the message object to send. 
+            // Only include 'text' if it has content, and only include 'media_url' if it has content.
+            const messageToSend = {
+                sender_id: userId,
+                // Only send text if it exists (allows sending only an image)
+                text: text || null, 
+                // Send the Base64 data if an image is selected
+                media_url: mediaUrl || null 
+            };
+
+            // If we are sending an image, clear the text input
+            if (mediaUrl && !text) {
+                messageInput.value = '';
+            }
+            
+            try {
+                const { data, error } = await supabaseClient
+                    .from(MESSAGES_TABLE_NAME)
+                    .insert([messageToSend])
+                    .select() 
+                    .single(); 
+
+                if (error) {
+                    throw new Error(error.message);
+                }
+                
+                console.log("SENDER: Message successfully inserted and retrieved. Appending locally for instant display:", data);
+                
+                // Append the message immediately for the SENDER
+                appendMessage(data); 
+
+                // Reset inputs and media state
+                messageInput.value = '';
+                clearImagePreview();
+                messageInput.focus();
+
+            } catch (error) {
+                console.error("Error sending message:", error);
+                document.getElementById('auth-message').textContent = 'Error sending message. Check console for details. (Did you run the SQL update to add media_url?)';
+            }
+        }
+
+        function initializeSupabase() {
+            console.log("Initializing Supabase client...");
+
+            if (SUPABASE_URL.includes('your-project-ref') || SUPABASE_ANON_KEY.includes('YOUR_ANON_PUBLIC_KEY')) {
+                document.getElementById('auth-status').textContent = 'ERROR: Keys Missing';
+                document.getElementById('auth-status').classList.replace('text-red-400', 'text-red-700');
+                console.error("Supabase keys are missing. Please replace placeholders with actual project URL and Anon key.");
+                return;
+            }
+
+            // Initialize client
+            supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            
+            // Set up Auth Listener
+            supabaseClient.auth.onAuthStateChange((event, session) => {
+                console.log('Supabase Auth Event:', event);
+                updateAuthState(session);
+            });
+            
+            console.log("Supabase client initialized.");
+        }
+
+
+        // Start the application setup
+        window.onload = initializeSupabase;
+
+    </script>
+</body>
+</html>
