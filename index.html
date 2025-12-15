@@ -210,14 +210,16 @@
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4'; 
         const MESSAGES_TABLE_NAME = 'messages'; 
         const PROFILES_TABLE_NAME = 'profiles'; 
+        // CRITICAL: This must match the bucket name you created in the Supabase Storage settings
+        const STORAGE_BUCKET_NAME = 'chat-media'; 
 
         let supabaseClient;
         let userId = null;
         let realTimeChannel = null;
         let userProfiles = {}; 
         
-        // NEW: Variable to hold the Base64 data of the selected image
-        let pendingMediaBase64 = null; 
+        // NEW: Variable to hold the File object of the selected media
+        let pendingMediaFile = null; 
 
         // UI Elements
         const authScreen = document.getElementById('auth-screen');
@@ -258,7 +260,7 @@
          * Clears the image preview and media data.
          */
         window.clearImagePreview = function() {
-            pendingMediaBase64 = null;
+            pendingMediaFile = null;
             mediaInput.value = ''; // Reset file input
             imagePreview.src = '';
             imagePreviewContainer.classList.add('hidden');
@@ -281,16 +283,18 @@
                  return;
             }
             
-            // Read the file as a Data URL (Base64)
+            // Store the file object for upload later
+            pendingMediaFile = file;
+
+            // Display preview using a Blob URL or FileReader for local file viewing
             const reader = new FileReader();
             reader.onload = function(e) {
-                pendingMediaBase64 = e.target.result;
-                imagePreview.src = pendingMediaBase64;
+                imagePreview.src = e.target.result;
                 imagePreviewContainer.classList.remove('hidden');
                 messageInput.focus();
                 authMessage.textContent = '';
             };
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(file); // Use DataURL for immediate preview
         }
         
         // Toggle settings modal (kept for completeness)
@@ -667,11 +671,12 @@
                         return;
                     }
 
-                    if (newMessage.sender_id === userId) {
-                        console.log('Ignoring own message from Realtime event (already appended locally).');
-                        return; 
+                    // A temporary check to avoid appending twice if the insert and select happen quickly
+                    if (document.getElementById(`message-${newMessage.id}`)) {
+                        console.log('Message already in DOM (Likely self-sent), ignoring Realtime INSERT event.');
+                        return;
                     }
-                    
+
                     console.log('RECEIVER: Appending new message from remote user instantly.');
                     appendMessage(newMessage);
                 })
@@ -694,45 +699,73 @@
                     }
                 });
         }
+        
+        // Utility to generate a unique file path for storage
+        function generateMediaPath(file) {
+            const timestamp = new Date().getTime();
+            const fileExtension = file.name.split('.').pop();
+            // Path: chat-media/user_id/timestamp_uuid.ext
+            return `${userId}/${timestamp}_${crypto.randomUUID()}.${fileExtension}`;
+        }
 
-        // Updated sendMessage function to handle text OR media
+        // Updated sendMessage function to handle text OR media upload to Storage
         window.sendMessage = async function() {
             const text = messageInput.value.trim();
-            const mediaUrl = pendingMediaBase64; 
+            const file = pendingMediaFile; // File object
 
-            // Check if both fields are empty. This logic correctly allows image-only sends.
-            if (text === "" && !mediaUrl || !userId || !supabaseClient) {
+            if (text === "" && !file || !userId || !supabaseClient) {
                  authMessage.textContent = "Please type a message or select an image.";
                  return;
             }
 
-            // Clear prior error messages
-            authMessage.textContent = ''; 
-            
-            // Construct the message object to send. 
-            // Only include 'text' if it has content, and only include 'media_url' if it has content.
-            const messageToSend = {
-                sender_id: userId,
-                // Only send text if it exists (allows sending only an image)
-                text: text || null, 
-                // Send the Base64 data if an image is selected
-                media_url: mediaUrl || null 
-            };
-
+            authMessage.textContent = 'Sending...'; 
+            let mediaUrl = null;
             
             try {
-                const { data, error } = await supabaseClient
+                if (file) {
+                    const filePath = generateMediaPath(file);
+                    
+                    // 1. Upload the file to Supabase Storage
+                    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+                        .from(STORAGE_BUCKET_NAME)
+                        .upload(filePath, file, {
+                            cacheControl: '3600',
+                            upsert: false
+                        });
+
+                    if (uploadError) {
+                        throw new Error(`Storage upload failed: ${uploadError.message}`);
+                    }
+                    
+                    // 2. Get the public URL for the file
+                    const { data: urlData } = supabaseClient.storage
+                        .from(STORAGE_BUCKET_NAME)
+                        .getPublicUrl(filePath);
+                    
+                    mediaUrl = urlData.publicUrl;
+                    console.log("Media Uploaded. URL:", mediaUrl);
+                }
+
+                // 3. Insert the message record into the database
+                const messageToSend = {
+                    sender_id: userId,
+                    text: text || null, 
+                    media_url: mediaUrl, // Now sending the public URL, not the Base64 data
+                };
+
+                const { data, error: insertError } = await supabaseClient
                     .from(MESSAGES_TABLE_NAME)
-                    // Insert the message and retrieve the newly created record (including the ID)
                     .insert([messageToSend])
                     .select() 
                     .single(); 
 
-                if (error) {
-                    throw new Error(error.message);
+                if (insertError) {
+                    // Important: If DB insert fails, the file is still in storage. We'd ideally delete it here.
+                    throw new Error(`Database insert failed: ${insertError.message}`);
                 }
                 
-                console.log("SENDER: Message successfully inserted and retrieved. Appending locally for instant display:", data);
+                authMessage.textContent = '';
+                console.log("SENDER: Message successfully inserted. Appending locally for instant display:", data);
                 
                 // Append the message immediately for the SENDER
                 appendMessage(data); 
@@ -744,7 +777,7 @@
 
             } catch (error) {
                 console.error("Error sending message:", error);
-                document.getElementById('auth-message').textContent = 'Error sending message. Check console for details. (Did you run the SQL update?)';
+                document.getElementById('auth-message').textContent = `Error sending message: ${error.message}`;
             }
         }
 
