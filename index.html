@@ -114,10 +114,10 @@
                         </button>
                         <input type="file" id="media-input" accept="image/*" class="hidden" onchange="handleImageSelection(event)">
                         
-                        <!-- Voice Message Button -->
-                        <button id="voice-message-btn" onclick="promptForVoiceMessage()"
+                        <!-- Voice Message Button (Now opens recording modal) -->
+                        <button id="voice-message-btn" 
                             class="flex items-center justify-center p-3 rounded-xl text-white mr-3 flex-shrink-0 transition duration-300 shadow-md"
-                            title="Generate Voice Message">
+                            title="Record Voice Message">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7v0a7 7 0 01-7-7v0a7 7 0 017-7v0a7 7 0 017 7z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21v-3"></path></svg>
                         </button>
 
@@ -212,27 +212,36 @@
     </div>
     
     <!-- ---------------------------------------------------- -->
-    <!-- VOICE MESSAGE PROMPT MODAL (New) -->
+    <!-- VOICE MESSAGE RECORDING MODAL (New Recording Interface) -->
     <!-- ---------------------------------------------------- -->
-    <div id="voice-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
+    <div id="record-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
         <div class="bg-gray-800 rounded-xl p-8 shadow-2xl w-full max-w-lg mx-4 border border-red-700 transform transition-all duration-300 scale-95 opacity-0">
-            <h3 class="text-xl font-bold mb-4 text-red-400">Send a Voice Message</h3>
-            <p class="text-gray-300 mb-4">Type the text you want the voice to say (up to 200 characters). You can also provide tone/style instructions (e.g., "Say cheerfully:").</p>
-            <textarea id="voice-text-input" rows="4" maxlength="200"
-                class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:ring-red-500 focus:border-red-500 text-gray-100 mb-4"
-                placeholder="E.g., Say in a deep tone: This chat just got an upgrade!"></textarea>
+            <h3 class="text-2xl font-bold mb-4 text-red-400 text-center">Record Voice Message</h3>
             
-            <p id="voice-message-status" class="text-center mt-4 text-sm text-yellow-400 mb-4"></p>
+            <div id="recording-state" class="flex flex-col items-center justify-center space-y-4">
+                <p id="recording-status" class="text-gray-300 text-center mb-4">Click the microphone to start recording.</p>
+                
+                <div class="flex space-x-8">
+                    <button id="record-start-btn" 
+                        class="p-4 bg-red-600 hover:bg-red-500 text-white rounded-full transition duration-200 shadow-xl disabled:bg-gray-500">
+                        <svg id="mic-icon" class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7v0a7 7 0 01-7-7v0a7 7 0 017-7v0a7 7 0 017 7z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21v-3"></path></svg>
+                    </button>
 
-            <div class="flex justify-end space-x-3">
-                <button onclick="closeVoiceModal()"
+                    <button id="record-stop-btn" disabled
+                        class="p-4 bg-green-600 hover:bg-green-500 text-white rounded-full transition duration-200 shadow-xl disabled:bg-gray-500 opacity-50">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6"></path></svg>
+                    </button>
+                </div>
+
+                <p id="recording-time" class="text-xl font-mono text-gray-500 mt-2">00:00</p>
+            </div>
+
+            <p id="record-message-status" class="text-center mt-4 text-sm text-yellow-400 mb-4"></p>
+
+            <div class="flex justify-end space-x-3 border-t border-gray-700 pt-4 mt-4">
+                <button onclick="closeRecordModal()"
                     class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-xl transition duration-200">
-                    Cancel
-                </button>
-                <button id="send-voice-button"
-                    onclick="generateAndSendVoiceMessage()"
-                    class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-semibold rounded-xl transition duration-200">
-                    Send Voice Message
+                    Close
                 </button>
             </div>
         </div>
@@ -250,12 +259,6 @@
         const PROFILES_TABLE_NAME = 'profiles'; 
         // CRITICAL: This must match the bucket name you created in the Supabase Storage settings
         const STORAGE_BUCKET_NAME = 'chat-media'; 
-
-        // --- Gemini TTS API Configuration ---
-        const GEMINI_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
-        const API_KEY = "AIzaSyARkle_Mc6lKoXu9KxBeBBR6UG89Ie6DO8";
-        const TTS_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TTS_MODEL}:generateContent?key=${API_KEY}`;
-        const TTS_VOICE = "Kore"; // A firm, clear voice
         
         let supabaseClient;
         let userId = null;
@@ -281,196 +284,188 @@
         const imagePreview = document.getElementById('image-preview');
         const imagePreviewContainer = document.getElementById('image-preview-container');
 
-        // Voice Modal Elements
-        const voiceModal = document.getElementById('voice-modal');
-        const voiceTextInput = document.getElementById('voice-text-input');
-        const voiceMessageStatus = document.getElementById('voice-message-status');
+        // Voice/Recording Modal Elements
+        const recordModal = document.getElementById('record-modal');
+        const recordStatus = document.getElementById('recording-status');
+        const recordTime = document.getElementById('recording-time');
+        const recordStartBtn = document.getElementById('record-start-btn');
+        const recordStopBtn = document.getElementById('record-stop-btn');
+        const recordMessageStatus = document.getElementById('record-message-status');
+
+        // Recording state variables
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let audioStream = null;
+        let timerInterval = null;
+        let startTime = 0;
 
 
-        // --- Audio Utility Functions (Needed for TTS PCM to WAV conversion) ---
-
-        /**
-         * Converts a base64 string to an ArrayBuffer.
-         */
-        function base64ToArrayBuffer(base64) {
-            const binaryString = atob(base64);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            return bytes.buffer;
-        }
+        // --- Voice Recording Logic (NEW) ---
         
-        /**
-         * Converts Int16Array (PCM data) into a playable WAV Blob.
-         * The TTS API returns signed 16-bit PCM (L16).
-         */
-        function pcmToWav(pcm16, sampleRate = 24000) {
-            const buffer = new ArrayBuffer(44 + pcm16.length * 2);
-            const view = new DataView(buffer);
-
-            // RIFF identifier 'RIFF'
-            writeString(view, 0, 'RIFF');
-            // file length (total - 8)
-            view.setUint32(4, 36 + pcm16.length * 2, true); 
-            // RIFF type 'WAVE'
-            writeString(view, 8, 'WAVE');
-            // format chunk identifier 'fmt '
-            writeString(view, 12, 'fmt '); 
-            // format chunk length
-            view.setUint32(16, 16, true);
-            // sample format (1 == PCM)
-            view.setUint16(20, 1, true); 
-            // number of channels
-            view.setUint16(22, 1, true); 
-            // sample rate
-            view.setUint32(24, sampleRate, true); 
-            // byte rate (sample rate * block align)
-            view.setUint32(28, sampleRate * 2, true); 
-            // block align (channels * bytes per sample)
-            view.setUint16(32, 2, true); 
-            // bits per sample
-            view.setUint16(34, 16, true); 
-            // data chunk identifier 'data'
-            writeString(view, 36, 'data');
-            // data chunk length (data size)
-            view.setUint32(40, pcm16.length * 2, true);
-
-            // Write PCM data
-            let offset = 44;
-            for (let i = 0; i < pcm16.length; i++, offset += 2) {
-                view.setInt16(offset, pcm16[i], true);
-            }
-
-            return new Blob([view], { type: 'audio/wav' });
-        }
-
-        /**
-         * Utility function to write a string to a DataView.
-         */
-        function writeString(view, offset, string) {
-            for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
-            }
-        }
-
-        // --- Voice Message Logic ---
-        
-        window.promptForVoiceMessage = function() {
+        window.openRecordModal = function() {
             if (!userId) {
                 authMessage.textContent = "Please log in to send voice messages.";
                 return;
             }
-            const modalContent = voiceModal.children[0];
+            const modalContent = recordModal.children[0];
             
-            voiceTextInput.value = '';
-            voiceMessageStatus.textContent = '';
+            recordStatus.textContent = "Click the microphone to start recording.";
+            recordTime.textContent = "00:00";
+            recordMessageStatus.textContent = '';
             
-            voiceModal.classList.remove('hidden');
+            // Reset button states
+            recordStartBtn.disabled = false;
+            recordStopBtn.disabled = true;
+            recordStopBtn.classList.add('opacity-50');
+
+            recordModal.classList.remove('hidden');
             setTimeout(() => {
                 modalContent.classList.remove('scale-95', 'opacity-0');
                 modalContent.classList.add('scale-100', 'opacity-100');
             }, 10);
         }
 
-        window.closeVoiceModal = function() {
-            const modalContent = voiceModal.children[0];
+        window.closeRecordModal = function() {
+            // Stop recording if active before closing
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+                audioStream = null;
+            }
+            clearInterval(timerInterval);
+            
+            const modalContent = recordModal.children[0];
             modalContent.classList.remove('scale-100', 'opacity-100');
             modalContent.classList.add('scale-95', 'opacity-0');
             setTimeout(() => {
-                voiceModal.classList.add('hidden');
+                recordModal.classList.add('hidden');
             }, 300);
         }
 
-        /**
-         * Calls the Gemini TTS API, uploads the audio, and sends the chat message.
-         */
-        window.generateAndSendVoiceMessage = async function() {
-            const text = voiceTextInput.value.trim();
-            if (!text) {
-                voiceMessageStatus.textContent = "Please enter text to synthesize.";
-                return;
-            }
-            if (userId === null) {
-                voiceMessageStatus.textContent = "Authentication required.";
-                return;
-            }
+        function updateTimeDisplay() {
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = String(Math.floor(elapsedTime / 60)).padStart(2, '0');
+            const seconds = String(elapsedTime % 60).padStart(2, '0');
+            recordTime.textContent = `${minutes}:${seconds}`;
+        }
 
-            voiceMessageStatus.textContent = "1/3: Generating audio...";
-            const sendButton = document.getElementById('send-voice-button');
-            sendButton.disabled = true;
-
-            let audioBlob;
-            let finalMessageText = text;
+        async function startRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') return;
 
             try {
-                // 1. Generate Audio via TTS API
-                const payload = {
-                    contents: [{
-                        parts: [{ text: finalMessageText }]
-                    }],
-                    generationConfig: {
-                        responseModalities: ["AUDIO"],
-                        speechConfig: {
-                            voiceConfig: {
-                                prebuiltVoiceConfig: { voiceName: TTS_VOICE }
-                            }
-                        }
-                    },
-                    model: GEMINI_TTS_MODEL
+                recordMessageStatus.textContent = 'Requesting microphone access...';
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Attempt to use a common/compatible MIME type for better cross-browser playback
+                const options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                     // Fallback to simpler/default format if webm is not supported
+                    options.mimeType = 'audio/ogg';
+                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                        delete options.mimeType; // Let MediaRecorder pick the default
+                    }
+                }
+                
+                mediaRecorder = new MediaRecorder(audioStream, options);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
                 };
 
-                // Exponential backoff retry loop
-                let response = null;
-                for (let attempt = 0; attempt < 3; attempt++) {
-                    try {
-                        response = await fetch(TTS_API_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        if (response.ok) break;
-                    } catch (e) {
-                        console.warn(`TTS API attempt ${attempt + 1} failed. Retrying...`, e);
-                        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+                mediaRecorder.onstop = () => {
+                    clearInterval(timerInterval);
+                    recordStatus.textContent = "Processing audio...";
+                    
+                    if (audioChunks.length === 0) {
+                        recordMessageStatus.textContent = "Recording failed or was too short.";
+                        // Cleanup stream
+                        if (audioStream) {
+                            audioStream.getTracks().forEach(track => track.stop());
+                        }
+                        audioStream = null;
+                        recordStartBtn.disabled = false;
+                        recordStopBtn.disabled = true;
+                        recordStopBtn.classList.add('opacity-50');
+                        return;
                     }
-                    if (attempt === 2) throw new Error("TTS API failed after multiple retries.");
+                    
+                    const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+                    // Immediately upload the blob
+                    uploadAndSendVoiceMessage(audioBlob);
+                };
+
+                mediaRecorder.onerror = (e) => {
+                    clearInterval(timerInterval);
+                    recordMessageStatus.textContent = `Recording error: ${e.error.name}`;
+                    console.error("MediaRecorder Error:", e.error);
+                    
+                    // Cleanup stream
+                    if (audioStream) {
+                        audioStream.getTracks().forEach(track => track.stop());
+                    }
+                    audioStream = null;
+                    recordStartBtn.disabled = false;
+                    recordStopBtn.disabled = true;
+                    recordStopBtn.classList.add('opacity-50');
+                };
+
+                mediaRecorder.start();
+                
+                recordStartBtn.disabled = true;
+                recordStopBtn.disabled = false;
+                recordStopBtn.classList.remove('opacity-50');
+                recordStatus.textContent = "Recording...";
+                recordMessageStatus.textContent = '';
+                
+                startTime = Date.now();
+                timerInterval = setInterval(updateTimeDisplay, 1000);
+
+            } catch (err) {
+                console.error("Microphone access denied or failed:", err);
+                recordMessageStatus.textContent = `Microphone access required: ${err.name}`;
+                recordStartBtn.disabled = false;
+                recordStopBtn.disabled = true;
+                recordStopBtn.classList.add('opacity-50');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                
+                // Cleanup stream immediately after stop
+                if (audioStream) {
+                    audioStream.getTracks().forEach(track => track.stop());
                 }
-
-                if (!response.ok) {
-                    throw new Error(`TTS API HTTP error: ${response.statusText}`);
-                }
+                audioStream = null;
                 
-                const result = await response.json();
-                const part = result?.candidates?.[0]?.content?.parts?.[0];
-                const audioData = part?.inlineData?.data;
-                const mimeType = part?.inlineData?.mimeType;
+                recordStartBtn.disabled = true;
+                recordStopBtn.disabled = true;
+                recordStopBtn.classList.add('opacity-50');
+            }
+        }
+        
+        /**
+         * Uploads the recorded audio Blob to Supabase Storage and inserts the message.
+         */
+        async function uploadAndSendVoiceMessage(audioBlob) {
+            recordMessageStatus.textContent = "1/2: Uploading audio...";
+            
+            try {
+                const mimeType = audioBlob.type.split(';')[0];
+                const extension = mimeType.split('/')[1] || 'webm'; 
+                const filePath = generateMediaPath({ name: `voice_message.${extension}` }, extension);
 
-                if (!audioData || !mimeType || !mimeType.startsWith("audio/L16")) {
-                    throw new Error("Invalid audio response from TTS API.");
-                }
-                
-                // Extract sample rate from mimeType (e.g., audio/L16;rate=24000)
-                const rateMatch = mimeType.match(/rate=(\d+)/);
-                const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
-                
-                const pcmData = base64ToArrayBuffer(audioData);
-                const pcm16 = new Int16Array(pcmData);
-                audioBlob = pcmToWav(pcm16, sampleRate);
-
-
-                // 2. Upload the WAV file to Supabase Storage
-                voiceMessageStatus.textContent = "2/3: Uploading audio...";
-                const fileName = `voice_${new Date().getTime()}.wav`;
-                const filePath = `${userId}/${fileName}`;
-                
+                // 1. Upload the Blob to Supabase Storage
                 const { data: uploadData, error: uploadError } = await supabaseClient.storage
                     .from(STORAGE_BUCKET_NAME)
                     .upload(filePath, audioBlob, {
                         cacheControl: '3600',
                         upsert: false,
-                        contentType: 'audio/wav'
+                        contentType: mimeType
                     });
 
                 if (uploadError) {
@@ -483,17 +478,16 @@
                 
                 const mediaUrl = urlData.publicUrl;
                 
-                // 3. Insert the message record into the database
-                voiceMessageStatus.textContent = "3/3: Sending message...";
+                // 2. Insert the message record into the database
+                recordMessageStatus.textContent = "2/2: Sending message...";
 
                 const messageToSend = {
                     sender_id: userId,
-                    // Use a recognizable prefix for the text content
-                    text: `[Voice Message: "${finalMessageText.substring(0, 50)}..."]`, 
+                    text: `[Voice Recording (${Math.floor(audioBlob.size / 1024)} KB)]`, 
                     media_url: mediaUrl, 
                 };
 
-                const { data, error: insertError } = await supabaseClient
+                const { data: insertedMsg, error: insertError } = await supabaseClient
                     .from(MESSAGES_TABLE_NAME)
                     .insert([messageToSend])
                     .select() 
@@ -503,16 +497,17 @@
                     throw new Error(`Database insert failed: ${insertError.message}`);
                 }
                 
-                voiceMessageStatus.textContent = "Voice message sent!";
-                appendMessage(data); 
+                recordMessageStatus.textContent = "Voice message sent!";
+                appendMessage(insertedMsg); 
 
-                setTimeout(() => closeVoiceModal(), 1000);
+                setTimeout(() => closeRecordModal(), 1000);
 
             } catch (error) {
                 console.error("Error sending voice message:", error);
-                voiceMessageStatus.textContent = `Error: ${error.message}`;
-            } finally {
-                sendButton.disabled = false;
+                recordMessageStatus.textContent = `Error: ${error.message}`;
+                recordStartBtn.disabled = false;
+                recordStopBtn.disabled = true;
+                recordStopBtn.classList.add('opacity-50');
             }
         }
 
@@ -521,7 +516,6 @@
 
         /**
          * Creates and returns the HTML element for a single chat message.
-         * NOW SUPPORTS Audio Playback.
          */
         function createMessageElement(msg) {
             const isMe = msg.sender_id === userId; 
@@ -542,18 +536,25 @@
             let bubbleContent;
             
             if (msg.media_url) {
-                const isAudio = msg.media_url.toLowerCase().endsWith('.wav');
+                // Check if it's an audio file based on extension (simple check)
+                const isAudio = msg.media_url.match(/\.(wav|mp3|ogg|webm)$/i); 
                 
                 if (isAudio) {
-                    // Render Audio Player
+                    // Render Audio Player for recorded audio
+                    // The 'type' attribute is important for the browser to know how to decode the blob
+                    const audioType = isAudio[1] === 'webm' ? 'audio/webm' : 'audio/*';
+
                     const audioHtml = `
                         <audio controls class="w-full max-w-xs md:max-w-sm rounded-lg shadow-md ${hasText ? 'mb-2' : ''}">
-                            <source src="${msg.media_url}" type="audio/wav">
+                            <source src="${msg.media_url}" type="${audioType}">
                             Your browser does not support the audio element.
                         </audio>
                     `;
                     
-                    bubbleContent = audioHtml + (hasText ? `<div class="pt-1">${msg.text}</div>` : '');
+                    // Use a simple prompt text if it's just the default generated message
+                    const textContent = (hasText && !msg.text.startsWith('[Voice Recording')) ? msg.text : `<div class="pt-1 text-sm text-gray-400">Recorded Voice Message</div>`;
+                    
+                    bubbleContent = audioHtml + textContent;
 
                 } else {
                     // Render Image
@@ -772,8 +773,6 @@
             }
         }
 
-        // Other auth/profile/delete logic remains the same...
-
         async function updateAuthState(session) {
             if (session) {
                 userId = session.user.id;
@@ -965,6 +964,13 @@
                 updateAuthState(session);
             });
         }
+
+        // Initialize button handlers for recording
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('voice-message-btn').onclick = window.openRecordModal;
+            recordStartBtn.onclick = startRecording;
+            recordStopBtn.onclick = stopRecording;
+        });
 
 
         // Start the application setup
