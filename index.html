@@ -28,6 +28,7 @@
 
             <!-- Title and Auth Status Bar -->
             <div class="border-b border-gray-700 pb-2 mb-4 flex justify-between items-center">
+                <!-- Changed Title to Nexus Chat and color to blue -->
                 <h1 class="text-2xl font-bold text-blue-400">Nexus Chat</h1>
                 <div id="user-status" class="flex items-center text-sm font-medium text-gray-400 p-2 bg-blue-900/30 rounded-lg space-x-3">
                     <button id="settings-button" onclick="toggleSettingsModal()"
@@ -254,13 +255,12 @@
             // Read the file as a Data URL (Base64)
             const reader = new FileReader();
             reader.onload = function(e) {
-                // Store Base64 data to be sent
                 pendingMediaBase64 = e.target.result;
-                // Show preview
                 imagePreview.src = pendingMediaBase64;
                 imagePreviewContainer.classList.remove('hidden');
                 messageInput.focus();
-                // Clear any previous error message
+                // Optionally clear text input if sending only media
+                messageInput.value = ''; 
                 authMessage.textContent = '';
             };
             reader.readAsDataURL(file);
@@ -385,13 +385,12 @@
 
             const time = msg.created_at 
                 ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-                : new ().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             // Determine content
             let contentHTML = '';
             if (msg.media_url) {
                 // If media_url exists, display the image
-                // The Base64 image is stored directly in media_url
                 contentHTML = `
                     <div class="mb-2 rounded-lg overflow-hidden border border-gray-600 shadow-md">
                         <img src="${msg.media_url}" 
@@ -478,7 +477,7 @@
             }
         }
 
-        // UPDATED: Added error handling to display Supabase error messages on screen
+
         window.handleAuth = async function(type) {
             const email = document.getElementById('auth-email').value.trim();
             const password = document.getElementById('auth-password').value.trim();
@@ -490,26 +489,19 @@
 
             authMessage.textContent = 'Processing...';
 
-            let response;
+            let error;
             if (type === 'signup') {
-                response = await supabaseClient.auth.signUp({ email, password });
+                const { error: signUpError } = await supabaseClient.auth.signUp({ email, password });
+                error = signUpError;
             } else {
-                response = await supabaseClient.auth.signInWithPassword({ email, password });
+                const { error: signInError } = await supabaseClient.auth.signInWithPassword({ email, password });
+                error = signInError;
             }
 
-            const { error } = response;
-
             if (error) {
-                console.error(`Supabase Auth Error (${type}):`, error);
-                // Display the specific error message from Supabase to help diagnose
-                authMessage.textContent = `Error: ${error.message}. Please check your credentials, email confirmation status, and Supabase RLS policies.`;
+                authMessage.textContent = `Error: ${error.message}`;
             } else if (type === 'signup') {
-                // Check for session in response to see if immediate sign-in happened
-                if (response.data.session) {
-                    authMessage.textContent = "Sign up successful and logged in!";
-                } else {
-                    authMessage.textContent = "Sign up successful! Please check your email for a confirmation link (if required by Supabase).";
-                }
+                authMessage.textContent = "Sign up successful! Please check your email for a confirmation link (if required by Supabase).";
             } else {
                 authMessage.textContent = "Login successful!";
             }
@@ -638,7 +630,7 @@
 
             } catch (error) {
                 console.error("Error sending message:", error);
-                document.getElementById('auth-message').textContent = 'Error sending message. Check console for details. (Did you run the SQL update to add media_url?)';
+                document.getElementById('auth-message').textContent = 'Error sending message. Check console for details. (Did you run the SQL update?)';
             }
         }
 
