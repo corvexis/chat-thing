@@ -53,6 +53,13 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                         </svg>
                     </button>
+                    <!-- NEW SEARCH TOGGLE BUTTON (Moved to Header) -->
+                    <button id="search-toggle-btn" onclick="toggleSearchInput()"
+                        class="text-white hover:text-blue-300 transition duration-200 focus:outline-none"
+                        title="Toggle Search">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </button>
+                    <!-- END NEW SEARCH TOGGLE BUTTON -->
                     <span id="auth-status" class="text-red-400">Connecting...</span>
                     <button id="logout-button" onclick="handleLogout()"
                         class="hidden bg-red-600 hover:bg-red-700 text-white text-xs font-semibold py-1 px-3 rounded-md transition duration-200">
@@ -141,15 +148,6 @@
                                     class="flex w-full border border-gray-700 bg-gray-700 text-gray-100 rounded-xl focus:outline-none focus:border-blue-500 pl-4 h-12 transition duration-200"
                                     onkeypress="if(event.keyCode === 13) sendMessage()" />
                             </div>
-                        </div>
-                        
-                        <!-- Search Toggle Button (NEW) -->
-                        <div class="ml-2">
-                            <button id="search-toggle-btn" onclick="toggleSearchInput()"
-                                class="flex items-center justify-center p-3 bg-gray-600 hover:bg-gray-500 rounded-xl text-white flex-shrink-0 transition duration-300 shadow-md"
-                                title="Toggle Search">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                            </button>
                         </div>
                         
                         <!-- Send Button -->
@@ -764,21 +762,21 @@
             renderMessages(filteredMessages);
         }
         
-        // NEW: Function to toggle search input visibility
+        // UPDATED: Function to toggle search input visibility and button styling
         window.toggleSearchInput = function() {
             isSearchActive = !isSearchActive;
 
             if (isSearchActive) {
                 searchInputContainer.classList.remove('hidden');
                 searchInput.focus();
-                searchToggleBtn.classList.replace('bg-gray-600', 'bg-blue-600');
-                searchToggleBtn.classList.add('ring-2', 'ring-blue-400');
+                searchToggleBtn.classList.add('text-blue-400');
+                searchToggleBtn.classList.remove('hover:text-blue-300');
             } else {
                 searchInputContainer.classList.add('hidden');
                 searchInput.value = ''; // Clear search
                 handleSearchInput(); // Rerender full list
-                searchToggleBtn.classList.replace('bg-blue-600', 'bg-gray-600');
-                searchToggleBtn.classList.remove('ring-2', 'ring-blue-400');
+                searchToggleBtn.classList.remove('text-blue-400');
+                searchToggleBtn.classList.add('hover:text-blue-300');
             }
         }
         
@@ -856,6 +854,7 @@
             imagePreview.src = '';
             imagePreviewContainer.classList.add('hidden');
             messageInput.focus();
+            document.getElementById('auth-message').textContent = '';
         }
 
         window.handleImageSelection = function(event) {
@@ -866,7 +865,7 @@
             }
 
             if (!file.type.startsWith('image/')) {
-                 authMessage.textContent = 'Please select an image file.';
+                 document.getElementById('auth-message').textContent = 'Please select an image file.';
                  clearImagePreview();
                  return;
             }
@@ -878,7 +877,7 @@
                 imagePreview.src = e.target.result;
                 imagePreviewContainer.classList.remove('hidden');
                 messageInput.focus();
-                authMessage.textContent = '';
+                document.getElementById('auth-message').textContent = '';
             };
             reader.readAsDataURL(file); 
         }
@@ -897,11 +896,11 @@
             const file = pendingMediaFile; // File object
 
             if (text === "" && !file || !userId || !supabaseClient) {
-                 authMessage.textContent = "Please type a message or select an image.";
+                 document.getElementById('auth-message').textContent = "Please type a message or select an image.";
                  return;
             }
 
-            authMessage.textContent = 'Sending...'; 
+            document.getElementById('auth-message').textContent = 'Sending...'; 
             let mediaUrl = null;
             
             try {
@@ -947,7 +946,7 @@
                     throw new Error(`Database insert failed: ${insertError.message}`);
                 }
                 
-                authMessage.textContent = '';
+                document.getElementById('auth-message').textContent = '';
                 console.log("SENDER: Message successfully inserted. Appending locally for instant display:", data);
                 
                 // Realtime listener handles rendering, but clear input immediately
@@ -998,6 +997,10 @@
                 authStatus.textContent = 'Active';
                 authStatus.classList.replace('text-red-400', 'text-green-400');
                 
+                // Ensure search button is styled correctly on login/load
+                searchToggleBtn.classList.add('hover:text-blue-300');
+                searchToggleBtn.classList.remove('text-blue-400');
+
                 await fetchProfiles(); 
                 updateProfileUI(); 
 
