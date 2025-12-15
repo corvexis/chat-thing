@@ -9,17 +9,23 @@
     <style>
         /* Custom styles for chat scroll and input */
         #chat-container {
-            height: calc(100vh - 18rem); /* Adjust height for full view */
+            /* Height is handled by flex-grow in parent, but this is a fallback if needed */
+            height: 100%; 
             overflow-y: auto;
             scroll-behavior: smooth;
         }
         /* Modal backdrop style */
         .modal-backdrop {
             background-color: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(2px);
         }
-        /* Style for the delete button hover effect */
-        .message-bubble:hover .delete-btn {
+        /* Style for the delete/edit button container hover effect */
+        .message-bubble:hover .delete-btn-group {
             opacity: 1;
+        }
+        .delete-btn-group {
+            opacity: 0;
+            transition: opacity 0.2s;
         }
         /* Style for the voice message button */
         #voice-message-btn {
@@ -85,9 +91,16 @@
             <div id="chat-screen" class="flex flex-col h-full overflow-hidden hidden">
 
                 <span id="current-user-id" class="text-sm font-mono text-gray-500 mb-2 truncate"></span>
-
+                
+                <!-- Search Input Field (NEW) -->
+                <div class="mb-3">
+                    <input type="text" id="search-input" placeholder="Search messages or users..."
+                        class="w-full p-3 rounded-xl bg-gray-700 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
+                        oninput="handleSearchInput()">
+                </div>
+                
                 <!-- Chat Messages Container -->
-                <div id="chat-container" class="flex flex-col h-full mb-4 space-y-4 p-4 bg-gray-900 rounded-xl">
+                <div id="chat-container" class="flex flex-col flex-grow mb-4 space-y-4 p-4 bg-gray-900 rounded-xl">
                     <div id="message-list" class="flex flex-col space-y-4">
                         <!-- Messages will be injected here -->
                     </div>
@@ -115,7 +128,7 @@
                         <input type="file" id="media-input" accept="image/*" class="hidden" onchange="handleImageSelection(event)">
                         
                         <!-- Voice Message Button (Now opens recording modal) -->
-                        <button id="voice-message-btn" 
+                        <button id="voice-message-btn" onclick="openRecordModal()"
                             class="flex items-center justify-center p-3 rounded-xl text-white mr-3 flex-shrink-0 transition duration-300 shadow-md"
                             title="Record Voice Message">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7v0a7 7 0 01-7-7v0a7 7 0 017-7v0a7 7 0 017 7z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21v-3"></path></svg>
@@ -191,6 +204,31 @@
     </div>
 
     <!-- ---------------------------------------------------- -->
+    <!-- EDIT MESSAGE MODAL (NEW) -->
+    <!-- ---------------------------------------------------- -->
+    <div id="edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
+        <div class="bg-gray-800 rounded-xl p-8 shadow-2xl w-full max-w-md mx-4 border border-blue-700 transform transition-all duration-300 scale-95 opacity-0">
+            <h3 class="text-xl font-bold mb-4 text-blue-400">Edit Message</h3>
+            <textarea id="edit-message-input" rows="4" placeholder="Enter new message..."
+                class="w-full p-3 rounded-lg bg-gray-700 border border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-100 mb-6"></textarea>
+            
+            <p id="edit-message-status" class="text-center mt-4 text-sm text-yellow-400 mb-4"></p>
+
+            <div class="flex justify-end space-x-3">
+                <button onclick="closeEditModal()"
+                    class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-xl transition duration-200">
+                    Cancel
+                </button>
+                <button id="confirm-edit-button" data-message-id=""
+                    onclick="confirmEdit()"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition duration-200">
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ---------------------------------------------------- -->
     <!-- DELETE CONFIRMATION MODAL (Unchanged) -->
     <!-- ---------------------------------------------------- -->
     <div id="delete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
@@ -265,6 +303,10 @@
         let realTimeChannel = null;
         let userProfiles = {}; 
         let pendingMediaFile = null; 
+        
+        // JS State Variables for Editing and Filtering
+        let allMessages = []; // To store all messages for filtering/searching
+        let isEditingMessageId = null; // Track message currently being edited
 
         // UI Elements
         const authScreen = document.getElementById('auth-screen');
@@ -279,10 +321,19 @@
         const settingsModal = document.getElementById('settings-modal');
         const settingsButton = document.getElementById('settings-button');
         
+        // Search Input
+        const searchInput = document.getElementById('search-input');
+
         // Media UI elements
         const mediaInput = document.getElementById('media-input');
         const imagePreview = document.getElementById('image-preview');
         const imagePreviewContainer = document.getElementById('image-preview-container');
+
+        // Edit Modal Elements
+        const editModal = document.getElementById('edit-modal');
+        const editMessageInput = document.getElementById('edit-message-input');
+        const confirmEditButton = document.getElementById('confirm-edit-button');
+        const editMessageStatus = document.getElementById('edit-message-status');
 
         // Voice/Recording Modal Elements
         const recordModal = document.getElementById('record-modal');
@@ -300,7 +351,7 @@
         let startTime = 0;
 
 
-        // --- Voice Recording Logic (NEW) ---
+        // --- Voice Recording Logic ---
         
         window.openRecordModal = function() {
             if (!userId) {
@@ -483,7 +534,7 @@
 
                 const messageToSend = {
                     sender_id: userId,
-                    text: `[Voice Recording (${Math.floor(audioBlob.size / 1024)} KB)]`, 
+                    text: `[Voice Recording (${recordTime.textContent})]`, 
                     media_url: mediaUrl, 
                 };
 
@@ -498,7 +549,8 @@
                 }
                 
                 recordMessageStatus.textContent = "Voice message sent!";
-                appendMessage(insertedMsg); 
+                // Realtime listener handles rendering, but we can append locally for quicker feedback
+                // appendMessage(insertedMsg); 
 
                 setTimeout(() => closeRecordModal(), 1000);
 
@@ -533,6 +585,8 @@
                 : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
             const hasText = msg.text && msg.text.trim().length > 0;
+            const isTextOnly = hasText && !msg.media_url; // Only text messages can be edited
+
             let bubbleContent;
             
             if (msg.media_url) {
@@ -541,7 +595,6 @@
                 
                 if (isAudio) {
                     // Render Audio Player for recorded audio
-                    // The 'type' attribute is important for the browser to know how to decode the blob
                     const audioType = isAudio[1] === 'webm' ? 'audio/webm' : 'audio/*';
 
                     const audioHtml = `
@@ -551,8 +604,7 @@
                         </audio>
                     `;
                     
-                    // Use a simple prompt text if it's just the default generated message
-                    const textContent = (hasText && !msg.text.startsWith('[Voice Recording')) ? msg.text : `<div class="pt-1 text-sm text-gray-400">Recorded Voice Message</div>`;
+                    const textContent = (hasText && !msg.text.startsWith('[Voice Recording')) ? `<div class="pt-1">${msg.text}</div>` : `<div class="pt-1 text-sm text-gray-400">Recorded Voice Message</div>`;
                     
                     bubbleContent = audioHtml + textContent;
 
@@ -562,6 +614,7 @@
                         <img src="${msg.media_url}" 
                             alt="Sent Image" 
                             class="w-full h-auto max-h-96 object-contain cursor-pointer rounded-lg shadow-md ${hasText ? 'mb-2' : ''}"
+                            onerror="this.onerror=null;this.src='https://placehold.co/384x384/4B5563/ffffff?text=Image+Load+Failed';"
                             onclick="window.open(this.src, '_blank')">
                     `;
                     
@@ -574,23 +627,35 @@
             } else {
                 bubbleContent = `<div>...</div>`;
             }
+            
+            // Add (Edited) label if needed (NEW)
+            const editedIndicator = msg.edited ? `<span class="text-xs text-yellow-300 ml-2 font-normal">(Edited)</span>` : '';
+
 
             const timeDiv = `<div class="text-xs mt-1 pt-1 border-t ${isMe ? 'border-blue-400' : 'border-gray-500'} text-right opacity-75">${time}</div>`;
             
-            const deleteButton = isMe ? `
-                <button onclick="openDeleteModal('${msg.id}')"
-                    class="delete-btn absolute top-[-10px] ${isMe ? 'left-[-15px]' : 'right-[-15px]'} 
-                            bg-red-500 hover:bg-red-400 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center 
-                            opacity-0 transition-opacity duration-200 shadow-lg z-10"
-                    title="Delete Message">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
+            // Edit and Delete buttons (NEW)
+            const actions = isMe ? `
+                <div class="flex space-x-1 delete-btn-group absolute top-[-10px] ${isMe ? 'left-[-40px]' : 'right-[-40px]'}">
+                    ${isTextOnly ? `
+                        <button onclick="openEditModal('${msg.id}', \`${msg.text.replace(/`/g, '\\`')}\`)"
+                            class="bg-blue-500 hover:bg-blue-400 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center"
+                            title="Edit Message">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-7-5L20 4m-12 12l4 4"></path></svg>
+                        </button>
+                    ` : ''}
+                    <button onclick="openDeleteModal('${msg.id}')"
+                        class="bg-red-500 hover:bg-red-400 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center"
+                        title="Delete Message">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
             ` : '';
 
             messageElement.innerHTML = `
                 <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-xs md:max-w-md group">
                     <div class="text-xs ${isMe ? 'text-gray-400 mr-2' : 'text-blue-400 ml-2'} font-semibold truncate max-w-[150px] md:max-w-[200px]" title="${msg.sender_id}">
-                        ${senderName}
+                        ${senderName} ${editedIndicator}
                     </div>
                     
                     <div class="flex ${isMe ? 'flex-row-reverse' : 'flex-row'} items-start mt-1 space-x-2 ${isMe ? 'space-x-reverse' : ''}">
@@ -602,7 +667,7 @@
 
                         <!-- Message Bubble -->
                         <div class="message-bubble relative ${isMe ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-100 border border-gray-600'} rounded-xl p-3 shadow-md">
-                            ${deleteButton}
+                            ${actions}
                             ${bubbleContent}
                             ${timeDiv}
                         </div>
@@ -616,13 +681,18 @@
         function scrollToBottom() {
             setTimeout(() => {
                 chatContainer.scrollTop = chatContainer.scrollHeight;
-            }, 0); 
+            }, 50); // Small delay to ensure rendering completes
         }
 
         // Appends a single message element to the list and scrolls.
         function appendMessage(msg) {
-            messageList.appendChild(createMessageElement(msg));
-            scrollToBottom();
+             // Since we use handleSearchInput for rendering updates, direct append is usually done only for local quick feedback or initial render.
+             // We will rely on handleSearchInput (triggered by realtime) for the main rendering flow.
+             const messageExists = document.getElementById(`message-${msg.id}`);
+             if (!messageExists) {
+                messageList.appendChild(createMessageElement(msg));
+                scrollToBottom();
+             }
         }
 
         // Removes a message element from the DOM.
@@ -630,6 +700,120 @@
             const element = document.getElementById(`message-${messageId}`);
             if (element) {
                 element.remove();
+            }
+        }
+
+
+        // --- Message Searching/Filtering Logic (NEW) ---
+
+        async function fetchInitialMessages() {
+             const { data, error } = await supabaseClient
+                .from(MESSAGES_TABLE_NAME)
+                .select('*')
+                .order('created_at', { ascending: true }); 
+
+            if (error) {
+                console.error("Error fetching initial messages:", error);
+                return [];
+            }
+            // Store fetched messages globally
+            allMessages = data;
+            return data;
+        }
+
+        function renderMessages(messagesToRender) {
+            messageList.innerHTML = ''; 
+            const fragment = document.createDocumentFragment();
+            
+            // Render only the filtered list
+            messagesToRender.forEach(msg => {
+                fragment.appendChild(createMessageElement(msg));
+            });
+            messageList.appendChild(fragment);
+            scrollToBottom();
+        }
+
+        window.handleSearchInput = function() {
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            let filteredMessages = allMessages;
+
+            if (searchTerm) {
+                filteredMessages = allMessages.filter(msg => {
+                    const profile = userProfiles[msg.sender_id] || {};
+                    const username = profile.username ? profile.username.toLowerCase() : '';
+                    
+                    return (
+                        (msg.text && msg.text.toLowerCase().includes(searchTerm)) ||
+                        username.includes(searchTerm)
+                    );
+                });
+            }
+            
+            renderMessages(filteredMessages);
+        }
+        
+        
+        // --- Message Editing Logic (NEW) ---
+        
+        window.openEditModal = function(messageId, currentText) {
+            if (!userId) {
+                authMessage.textContent = "Please log in to edit messages.";
+                return;
+            }
+            
+            isEditingMessageId = messageId;
+            editMessageInput.value = currentText;
+            editMessageStatus.textContent = '';
+            confirmEditButton.dataset.messageId = messageId;
+            
+            const modalContent = editModal.children[0];
+            
+            editModal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+            editMessageInput.focus();
+        }
+
+        window.closeEditModal = function() {
+            isEditingMessageId = null;
+            editMessageInput.value = '';
+            editMessageStatus.textContent = '';
+            
+            const modalContent = editModal.children[0];
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                editModal.classList.add('hidden');
+            }, 300);
+        }
+
+        window.confirmEdit = async function() {
+            const messageId = confirmEditButton.dataset.messageId;
+            const newText = editMessageInput.value.trim();
+
+            if (!newText) {
+                editMessageStatus.textContent = 'Message cannot be empty.';
+                return;
+            }
+            
+            editMessageStatus.textContent = 'Saving changes...';
+
+            const { error } = await supabaseClient
+                .from(MESSAGES_TABLE_NAME)
+                .update({ text: newText, edited: true, created_at: new Date().toISOString() }) 
+                .eq('id', messageId);
+
+            if (error) {
+                console.error("Error updating message:", error);
+                editMessageStatus.textContent = `Error saving: ${error.message}`;
+            } else {
+                editMessageStatus.textContent = 'Saved!';
+                setTimeout(() => {
+                    closeEditModal();
+                    document.getElementById('auth-message').textContent = 'Message updated successfully.';
+                }, 500);
             }
         }
 
@@ -720,6 +904,7 @@
                     sender_id: userId,
                     text: text || null, 
                     media_url: mediaUrl, 
+                    edited: false // New field for edited status
                 };
 
                 const { data, error: insertError } = await supabaseClient
@@ -735,8 +920,8 @@
                 authMessage.textContent = '';
                 console.log("SENDER: Message successfully inserted. Appending locally for instant display:", data);
                 
-                appendMessage(data); 
-
+                // Realtime listener handles rendering, but clear input immediately
+                
                 // Reset inputs and media state
                 messageInput.value = '';
                 clearImagePreview();
@@ -749,7 +934,7 @@
         }
 
 
-        // --- Supabase Auth and Realtime Logic (omitted for brevity, assume unchanged/working) ---
+        // --- Supabase Auth and Realtime Logic ---
         
         window.toggleSettingsModal = function() {
             const modalContent = settingsModal.children[0];
@@ -801,6 +986,7 @@
                 currentUserIdElement.textContent = '';
                 messageList.innerHTML = ''; 
                 userProfiles = {}; 
+                allMessages = []; // Clear stored messages
                 
                 if (realTimeChannel) {
                     supabaseClient.removeChannel(realTimeChannel);
@@ -892,6 +1078,34 @@
 
             if (!messageId) return;
             
+            const messageToDelete = allMessages.find(m => m.id.toString() === messageId.toString());
+
+            // 1. Delete associated media file if it exists
+            if (messageToDelete && messageToDelete.media_url) {
+                try {
+                    // Extract file path from public URL
+                    const urlPath = new URL(messageToDelete.media_url).pathname;
+                    // The path starts after /storage/v1/object/public/{BUCKET_NAME}/
+                    const filePathStartIndex = urlPath.indexOf(`/${STORAGE_BUCKET_NAME}/`) + `/${STORAGE_BUCKET_NAME}/`.length;
+                    const filePath = urlPath.substring(filePathStartIndex);
+                    
+                    if (filePath) {
+                        const { error: storageError } = await supabaseClient
+                            .storage
+                            .from(STORAGE_BUCKET_NAME)
+                            .remove([filePath]);
+                        
+                        if (storageError) {
+                            console.error("Error deleting media file from storage:", storageError);
+                            document.getElementById('auth-message').textContent = `Error deleting media file: ${storageError.message}`;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error processing media URL for deletion:", e);
+                }
+            }
+
+            // 2. Delete the message record from the database
             const { error } = await supabaseClient
                 .from(MESSAGES_TABLE_NAME)
                 .delete()
@@ -900,31 +1114,15 @@
             if (error) {
                 console.error("Error deleting message:", error);
                 document.getElementById('auth-message').textContent = `Error deleting message: ${error.message}`;
+            } else {
+                 document.getElementById('auth-message').textContent = 'Message deleted successfully.';
             }
         }
         
-        async function fetchInitialMessages() {
-             const { data, error } = await supabaseClient
-                .from(MESSAGES_TABLE_NAME)
-                .select('*')
-                .order('created_at', { ascending: true }); 
-
-            if (error) {
-                console.error("Error fetching initial messages:", error);
-                return [];
-            }
-            return data;
-        }
-
         function startMessageListener() {
             fetchInitialMessages().then(initialMessages => {
-                messageList.innerHTML = ''; 
-                const fragment = document.createDocumentFragment();
-                initialMessages.forEach(msg => {
-                    fragment.appendChild(createMessageElement(msg));
-                });
-                messageList.appendChild(fragment);
-                scrollToBottom();
+                // Initial render uses all fetched messages
+                renderMessages(initialMessages); 
             });
 
             if (realTimeChannel) {
@@ -937,14 +1135,33 @@
                     const newMessage = payload.new;
                     if (!newMessage || !newMessage.sender_id) return;
 
-                    if (document.getElementById(`message-${newMessage.id}`)) return; // Avoid double-render
+                    // Sync global state
+                    allMessages.push(newMessage);
+                    
+                    // Re-render based on current search term
+                    handleSearchInput(); 
+                })
+                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
+                    const updatedMessage = payload.new;
+                    if (!updatedMessage || !updatedMessage.sender_id) return;
 
-                    appendMessage(newMessage);
+                    // Sync global state: Find and replace the old message
+                    const index = allMessages.findIndex(m => m.id === updatedMessage.id);
+                    if (index > -1) {
+                        allMessages[index] = updatedMessage;
+                    }
+
+                    // Re-render based on current search term
+                    handleSearchInput(); 
                 })
                 .on('postgres_changes', { event: 'DELETE', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
                     const deletedId = payload.old.id;
                     if (deletedId) {
-                        removeMessageElement(deletedId);
+                        // Sync global state
+                        allMessages = allMessages.filter(m => m.id !== deletedId);
+                        
+                        // Re-render based on current search term
+                        handleSearchInput(); 
                     }
                 })
                 .subscribe();
@@ -967,7 +1184,7 @@
 
         // Initialize button handlers for recording
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('voice-message-btn').onclick = window.openRecordModal;
+            // Voice recording handlers (already present)
             recordStartBtn.onclick = startRecording;
             recordStopBtn.onclick = stopRecording;
         });
