@@ -377,7 +377,8 @@
         let dmRecipientUsername = null; 
         // { userId: { username: 'Name', lastMessageTime: Date object } }
         let activeDMPartners = {}; // To track partners for the dropdown menu
-        let dmLastReadTimestamps = {}; // NEW: Client-side tracking of last time DM was opened
+        // Stores the timestamp of when the user LAST *entered* or *left* a specific DM
+        let dmLastReadTimestamps = {}; 
 
         // UI Elements
         const authScreen = document.getElementById('auth-screen');
@@ -476,23 +477,43 @@
             startDM(recipientId, username);
         }
 
+        /**
+         * Enters a Direct Message chat.
+         * Sets the read timestamp and updates the UI and messages.
+         */
         function startDM(recipientId, username) {
             dmRecipientId = recipientId;
             dmRecipientUsername = username;
-            // Mark this DM as read now
+            
+            // 1. Mark this DM as read NOW (before fetching messages)
             dmLastReadTimestamps[recipientId] = new Date(); 
+            
+            // 2. Update UI header
             updateHeader();
+            
+            // 3. Fetch and render messages for the new DM
             fetchCurrentMessages().then(renderMessages);
+            
+            // 4. Force a refresh of the DM dropdown list to clear the badge
+            fetchActiveDMPartners(); 
+
             document.getElementById('auth-message').textContent = `Now in private chat with ${username}.`;
         }
 
+        /**
+         * Leaves a Direct Message chat and returns to Public Chat.
+         */
         window.leaveDM = function() {
             if (dmRecipientId) {
-                // Mark the chat we are leaving as read
+                // Mark the chat we are leaving as read now
                 dmLastReadTimestamps[dmRecipientId] = new Date();
+                // Force a refresh of the DM dropdown list to ensure the badge is cleared
+                fetchActiveDMPartners();
             }
+            
             dmRecipientId = null;
             dmRecipientUsername = null;
+            
             updateHeader();
             fetchCurrentMessages().then(renderMessages);
             document.getElementById('auth-message').textContent = 'Back in Public Chat.';
@@ -543,7 +564,6 @@
             // 2. Close and re-render the dropdown if necessary
             dmDropdownMenu.classList.add('hidden');
             dropdownIcon.classList.remove('rotate-180');
-            // Do not call renderDMList here, it is called when opening the dropdown or by fetchActiveDMPartners
         }
         
         function renderDMList() {
@@ -1566,6 +1586,10 @@
                                     messageText,
                                     () => startDM(senderId, senderName)
                                 );
+                            } else {
+                                // REFINEMENT: If a new message comes in for the current open DM, 
+                                // we update the read time to prevent a brief flash of the badge.
+                                dmLastReadTimestamps[senderId] = new Date();
                             }
                         }
                         // --- End Notification Logic ---
