@@ -352,6 +352,11 @@
     <script type="module">
         // --- Supabase Client Import ---
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.0/+esm'
+        supabaseClient = createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+);
+
 
         // --- Supabase Configuration (***REPLACE THESE WITH YOUR ACTUAL KEYS***) ---
         const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; 
@@ -470,7 +475,7 @@
                 notificationPermission = Notification.permission;
             }
         }
-
+        
         /**
          * Displays a native browser notification (only when tab is in background).
          */
@@ -1412,9 +1417,46 @@
             }
         }
 
+// --- Supabase Auth and Realtime Logic ---
 
-        // --- Supabase Auth and Realtime Logic ---
-        
+window.handleAuth = async function (mode) {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+
+    if (!email || !password) {
+        authMessage.textContent = 'Email and password required.';
+        return;
+    }
+
+    authMessage.textContent = 'Processing…';
+
+    let result;
+
+    if (mode === 'login') {
+        result = await supabaseClient.auth.signInWithPassword({
+            email,
+            password
+        });
+    } else {
+        result = await supabaseClient.auth.signUp({
+            email,
+            password
+        });
+    }
+
+    if (result.error) {
+        authMessage.textContent = result.error.message;
+        return;
+    }
+
+    authMessage.textContent = 'Success!';
+};
+     
+        window.handleLogout = async function () {
+    await supabaseClient.auth.signOut();
+};
+
+
         window.toggleSettingsModal = function() {
             const modalContent = settingsModal.children[0];
 
