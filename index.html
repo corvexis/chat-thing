@@ -377,6 +377,7 @@
         let dmRecipientUsername = null; 
         // { userId: { username: 'Name', lastMessageTime: Date object } }
         let activeDMPartners = {}; // To track partners for the dropdown menu
+        let dmLastReadTimestamps = {}; // NEW: Client-side tracking of last time DM was opened
 
         // UI Elements
         const authScreen = document.getElementById('auth-screen');
@@ -478,12 +479,18 @@
         function startDM(recipientId, username) {
             dmRecipientId = recipientId;
             dmRecipientUsername = username;
+            // Mark this DM as read now
+            dmLastReadTimestamps[recipientId] = new Date(); 
             updateHeader();
             fetchCurrentMessages().then(renderMessages);
             document.getElementById('auth-message').textContent = `Now in private chat with ${username}.`;
         }
 
         window.leaveDM = function() {
+            if (dmRecipientId) {
+                // Mark the chat we are leaving as read
+                dmLastReadTimestamps[dmRecipientId] = new Date();
+            }
             dmRecipientId = null;
             dmRecipientUsername = null;
             updateHeader();
@@ -580,9 +587,18 @@
 
                 const time = partner.lastMessageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 
+                // NEW: Unread message badge
+                const unreadCount = partner.unreadCount || 0;
+                const badgeHtml = unreadCount > 0 
+                    ? `<span class="ml-2 px-2 py-0.5 text-xs font-bold bg-red-600 text-white rounded-full">
+                        ${unreadCount}
+                    </span>` 
+                    : '';
+
                 dmItem.innerHTML = `
                     ${statusIndicator}
                     <span class="flex-grow">${partner.username}</span>
+                    ${badgeHtml}
                     <span class="text-xs text-gray-400 ml-2">${time}</span>
                 `;
                 dmListContainer.appendChild(dmItem);
@@ -1017,7 +1033,7 @@
             return data;
         }
         
-        // NEW: Function to fetch all DM metadata to populate the dropdown
+        // NEW: Function to fetch all DM metadata to populate the dropdown AND count unread messages
         async function fetchActiveDMPartners() {
             if (!userId) {
                 activeDMPartners = {};
@@ -1025,8 +1041,7 @@
                 return;
             }
 
-            // Fetch messages where recipient_id is not null AND involves current user
-            // Select only the data needed to identify the partner and sort (last message time)
+            // 1. Fetch all DM messages involving the current user to find partners and last message time
             const { data, error } = await supabaseClient
                 .from(MESSAGES_TABLE_NAME)
                 .select('sender_id, recipient_id, created_at')
@@ -1041,21 +1056,46 @@
             
             const partners = {};
             
-            // Iterate through the messages to find unique partners and their last message time
+            // Identify unique partners and their latest message time
             data.forEach(msg => {
                 const partnerId = msg.sender_id === userId ? msg.recipient_id : msg.sender_id;
                 
-                // Ensure we only process DMs with other users, and only process each partner once (due to the descending order query)
                 if (partnerId && partnerId !== userId && !partners[partnerId]) {
                     const partnerProfile = userProfiles[partnerId] || {};
                     if (partnerProfile.username) {
                         partners[partnerId] = {
                             username: partnerProfile.username,
-                            lastMessageTime: new Date(msg.created_at)
+                            lastMessageTime: new Date(msg.created_at),
+                            unreadCount: 0 // Initialize count
                         };
                     }
                 }
             });
+            
+            // 2. Fetch unread counts for all identified partners
+            const partnerIdsToProcess = Object.keys(partners);
+
+            for (const partnerId of partnerIdsToProcess) {
+                // Get the timestamp when the user last opened this DM chat, default to epoch (0)
+                const lastReadTime = dmLastReadTimestamps[partnerId] || new Date(0); 
+                // Supabase prefers ISO string for comparison
+                const lastReadISO = lastReadTime.toISOString();
+                
+                // Count messages sent by the partner (them -> me) AFTER lastReadISO time.
+                const { count: unreadCount, error: countError } = await supabaseClient
+                    .from(MESSAGES_TABLE_NAME)
+                    .select('id', { count: 'exact' }) 
+                    .eq('sender_id', partnerId) // Must be sent by the partner
+                    .eq('recipient_id', userId) // Must be sent to me
+                    .gt('created_at', lastReadISO); // Must be newer than last read time
+
+                if (countError) {
+                    console.error(`Error counting unread messages for ${partners[partnerId].username}:`, countError);
+                    partners[partnerId].unreadCount = 0;
+                } else {
+                    partners[partnerId].unreadCount = unreadCount;
+                }
+            }
             
             activeDMPartners = partners;
             renderDMList(); // Update the dropdown content
@@ -1358,6 +1398,7 @@
                 allMessages = []; // Clear stored messages
                 dmRecipientId = null; // Reset DM state
                 activeDMPartners = {}; // Clear DM partners list
+                dmLastReadTimestamps = {}; // Clear read timestamps
                 
                 if (realTimeChannel) {
                     // Keep the channel open, but clear chat view
@@ -1576,4 +1617,4 @@
 
     </script>
 </body>
-    </html>
+</html>
