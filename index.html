@@ -352,15 +352,16 @@
     <script type="module">
         // --- Supabase Client Import ---
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.0/+esm'
+
+        // --- Supabase Configuration (***REPLACE THESE WITH YOUR ACTUAL KEYS***) ---
+        const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4'; 
+      
         supabaseClient = createClient(
     SUPABASE_URL,
     SUPABASE_ANON_KEY
 );
 
-
-        // --- Supabase Configuration (***REPLACE THESE WITH YOUR ACTUAL KEYS***) ---
-        const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; 
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4'; 
         const MESSAGES_TABLE_NAME = 'messages'; 
         const PROFILES_TABLE_NAME = 'profiles'; 
         // CRITICAL: This must match the bucket name you created in the Supabase Storage settings
