@@ -43,6 +43,12 @@
 <!-- DARK MODE: Body background and text color -->
 <body class="bg-gray-900 flex flex-col h-screen antialiased text-gray-100 font-sans">
 
+    <!-- Notification Container (NEW) -->
+    <div id="notification-container" class="fixed top-0 right-0 m-4 z-50 space-y-2">
+        <!-- Notifications will be injected here -->
+    </div>
+    <!-- End Notification Container -->
+
     <div class="flex flex-col flex-auto h-full p-6">
         <!-- Main container background -->
         <div class="flex flex-col flex-auto flex-shrink-0 rounded-2xl bg-gray-800 p-4 shadow-xl h-full">
@@ -421,6 +427,9 @@
         const dmListContainer = document.getElementById('dm-list-container'); 
         const noDmText = document.getElementById('no-dm-text'); 
         const dropdownIcon = document.getElementById('dropdown-icon');
+        
+        // Notification UI Elements (NEW)
+        const notificationContainer = document.getElementById('notification-container');
 
         // Recording state variables
         let mediaRecorder = null;
@@ -925,6 +934,53 @@
             const element = document.getElementById(`message-${messageId}`);
             if (element) {
                 element.remove();
+            }
+        }
+        
+        // --- Notification Logic (NEW) ---
+
+        /**
+         * Shows a temporary, dismissible notification.
+         * @param {string} title - The title of the notification (e.g., Sender Name).
+         * @param {string} body - The message content.
+         * @param {function} onClick - Optional function to run when notification is clicked.
+         */
+        function showNotification(title, body, onClick = null) {
+            const notif = document.createElement('div');
+            // Tailwind classes for the 'Android' style notification
+            notif.className = 'bg-gray-700 text-white p-4 rounded-xl shadow-2xl transition-all duration-500 transform translate-x-full opacity-0 max-w-sm border-l-4 border-blue-400 cursor-pointer';
+            notif.innerHTML = `
+                <div class="font-bold text-blue-400">${title}</div>
+                <p class="text-sm mt-1 text-gray-200 truncate">${body}</p>
+            `;
+            
+            // Handle click to go to the DM
+            if (onClick) {
+                notif.onclick = () => {
+                    onClick();
+                    dismissNotification(notif); // Close the notification on click
+                };
+            }
+
+            notificationContainer.appendChild(notif);
+
+            // Animate in
+            setTimeout(() => {
+                notif.classList.remove('translate-x-full', 'opacity-0');
+            }, 50);
+
+            // Auto-dismiss after 5 seconds
+            setTimeout(() => {
+                dismissNotification(notif);
+            }, 5000);
+        }
+
+        function dismissNotification(notifElement) {
+            if (notificationContainer.contains(notifElement)) {
+                notifElement.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => {
+                    notifElement.remove();
+                }, 500); // Wait for transition to finish
             }
         }
 
@@ -1452,6 +1508,27 @@
                 realTimeChannel = supabaseClient
                     .channel('public-chat')
                     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
+                        const newMessage = payload.new;
+                        
+                        // --- New Notification Logic ---
+                        if (newMessage.recipient_id && newMessage.recipient_id === userId) {
+                             // This is a DM sent TO ME
+                            const senderId = newMessage.sender_id;
+                            const senderProfile = userProfiles[senderId] || {};
+                            const senderName = senderProfile.username || 'New User';
+                            
+                            // Check if I am *not* currently in this DM chat
+                            if (dmRecipientId !== senderId) {
+                                const messageText = newMessage.text || 'Sent a media message.';
+                                showNotification(
+                                    `New DM from ${senderName}`,
+                                    messageText,
+                                    () => startDM(senderId, senderName)
+                                );
+                            }
+                        }
+                        // --- End Notification Logic ---
+
                         // When a new message arrives, re-fetch and re-render to apply current DM/Search filter
                         fetchCurrentMessages().then(renderMessages);
                         fetchActiveDMPartners(); // Update DM list on new message
@@ -1499,4 +1576,4 @@
 
     </script>
 </body>
-</html>
+    </html>
