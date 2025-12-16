@@ -355,7 +355,7 @@
 
         // --- Supabase Configuration (***REPLACE THESE WITH YOUR ACTUAL KEYS***) ---
         const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; 
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3phd3Z0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4'; 
         const MESSAGES_TABLE_NAME = 'messages'; 
         const PROFILES_TABLE_NAME = 'profiles'; 
         // CRITICAL: This must match the bucket name you created in the Supabase Storage settings
@@ -439,7 +439,66 @@
         let audioStream = null;
         let timerInterval = null;
         let startTime = 0;
+        
+        // Global state for notification permission (NEW)
+        let notificationPermission = 'default'; 
 
+        // --- NATIVE NOTIFICATION LOGIC (NEW) ---
+        
+        /**
+         * Requests permission for native browser notifications.
+         */
+        function requestNotificationPermission() {
+            // Check if Notification API is supported
+            if (!("Notification" in window)) {
+                console.warn("Browser does not support desktop notification.");
+                return;
+            }
+            
+            // Only ask if permission hasn't been granted or denied yet
+            if (Notification.permission === 'default') {
+                Notification.requestPermission().then(permission => {
+                    notificationPermission = permission;
+                    console.log("Notification permission:", permission);
+                    if (permission === 'denied') {
+                        showNotification("Notifications Blocked", "Please enable browser notifications in your site settings to receive background alerts.", null);
+                    }
+                }).catch(error => {
+                    console.error("Error requesting notification permission:", error);
+                });
+            } else {
+                notificationPermission = Notification.permission;
+            }
+        }
+
+        /**
+         * Displays a native browser notification (only when tab is in background).
+         */
+        function displayNativeNotification(title, body, senderId, senderName) {
+            // Only show native notification if permission is granted AND the tab is in the background
+            if (notificationPermission === 'granted' && document.visibilityState === 'hidden') {
+                console.log("Displaying native notification.");
+                const notification = new Notification(title, {
+                    body: body,
+                    // Placeholder icon for Nexus Chat
+                    icon: 'https://placehold.co/100x100/1D4ED8/ffffff?text=N', 
+                    tag: `dm-${senderId}`, // Prevents duplicate notifications from the same sender
+                    renotify: true
+                });
+
+                // Handle notification click to focus the tab and switch to the DM
+                notification.onclick = () => {
+                    window.focus(); // Focus the browser tab
+                    startDM(senderId, senderName); // Switch to the relevant DM
+                    notification.close();
+                };
+                
+                // Dismiss the notification after 5 seconds if not clicked
+                setTimeout(() => {
+                    notification.close();
+                }, 5000); 
+            }
+        }
 
         // --- DM/Chat Switching Logic ---
 
@@ -973,10 +1032,10 @@
             }
         }
         
-        // --- Notification Logic (NEW) ---
+        // --- Notification Logic (UPDATED) ---
 
         /**
-         * Shows a temporary, dismissible notification.
+         * Shows a temporary, dismissible notification (in-app toast).
          * @param {string} title - The title of the notification (e.g., Sender Name).
          * @param {string} body - The message content.
          * @param {function} onClick - Optional function to run when notification is clicked.
@@ -1394,6 +1453,9 @@
 
                 await fetchProfiles(); 
                 updateProfileUI(); 
+                
+                // NEW: Request notification permission on successful login
+                requestNotificationPermission();
 
                 if (!realTimeChannel) {
                     startMessageListener();
@@ -1581,11 +1643,24 @@
                             // Check if I am *not* currently in this DM chat
                             if (dmRecipientId !== senderId) {
                                 const messageText = newMessage.text || 'Sent a media message.';
+                                
+                                // 1. Display IN-APP toast notification 
                                 showNotification(
                                     `New DM from ${senderName}`,
                                     messageText,
                                     () => startDM(senderId, senderName)
                                 );
+                                
+                                // 2. Display NATIVE browser notification (when tab is in background)
+                                if (document.visibilityState === 'hidden') {
+                                     displayNativeNotification(
+                                        `Nexus DM: ${senderName}`,
+                                        messageText,
+                                        senderId,
+                                        senderName
+                                    );
+                                }
+                                
                             } else {
                                 // REFINEMENT: If a new message comes in for the current open DM, 
                                 // we update the read time to prevent a brief flash of the badge.
