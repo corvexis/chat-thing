@@ -34,6 +34,10 @@
         #voice-message-btn:hover {
             background-image: linear-gradient(to right, #dc2626 0%, #b91c1c 100%);
         }
+        /* Style for dropdown rotation */
+        .rotate-180 {
+            transform: rotate(180deg);
+        }
     </style>
 </head>
 <!-- DARK MODE: Body background and text color -->
@@ -45,8 +49,32 @@
 
             <!-- Title and Auth Status Bar -->
             <div class="border-b border-gray-700 pb-2 mb-4 flex justify-between items-center">
-                <!-- Updated Title to be dynamic -->
-                <h1 id="chat-title" class="text-2xl font-bold text-blue-400">Nexus Chat (Public)</h1>
+                
+                <!-- Chat Mode Selector (Button/Dropdown) -->
+                <div class="relative inline-block text-left">
+                    <button id="chat-mode-button" onclick="toggleDMDropdown()"
+                        class="flex items-center text-2xl font-bold text-blue-400 p-1 rounded-lg transition duration-200 hover:bg-blue-900/20 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <span id="chat-title-text">Nexus Chat (Public)</span>
+                        <svg id="dropdown-icon" class="w-5 h-5 ml-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+
+                    <!-- Dropdown Menu -->
+                    <div id="dm-dropdown-menu" class="hidden absolute left-0 mt-2 w-64 rounded-md shadow-lg bg-gray-700 ring-1 ring-black ring-opacity-5 z-20 origin-top-left">
+                        <div class="py-1" role="menu" aria-orientation="vertical" aria-labelledby="chat-mode-button">
+                            <!-- Public Chat Option (Always available) -->
+                            <a href="#" onclick="leaveDM(); toggleDMDropdown();"
+                                class="flex items-center px-4 py-2 text-sm text-gray-100 transition duration-150 hover:bg-blue-600/50 hover:text-white" role="menuitem">
+                                <span class="mr-2 text-green-400">&#9679;</span>
+                                Public Chat
+                            </a>
+                            <div id="dm-list-container" class="border-t border-gray-600 my-1 pt-1">
+                                <!-- Direct Messages will be rendered here -->
+                            </div>
+                            <div id="no-dm-text" class="px-4 py-2 text-xs text-gray-400 text-center hidden">No active private chats.</div>
+                        </div>
+                    </div>
+                </div>
+                
                 <div id="user-status" class="flex items-center text-sm font-medium text-gray-400 p-2 bg-blue-900/30 rounded-lg space-x-3">
                     <button id="settings-button" onclick="toggleSettingsModal()"
                         class="hidden text-white hover:text-blue-300 transition duration-200 focus:outline-none" title="Profile Settings">
@@ -341,6 +369,8 @@
         // DM State Variables (NEW)
         let dmRecipientId = null; // null for public chat, user ID for DM
         let dmRecipientUsername = null; 
+        // { userId: { username: 'Name', lastMessageTime: Date object } }
+        let activeDMPartners = {}; // To track partners for the dropdown menu
 
         // UI Elements
         const authScreen = document.getElementById('auth-screen');
@@ -380,11 +410,17 @@
         const recordMessageStatus = document.getElementById('record-message-status');
 
         // DM UI Elements (NEW)
-        const chatTitleElement = document.getElementById('chat-title');
+        const chatTitleElement = document.getElementById('chat-title-text');
         const dmModal = document.getElementById('dm-modal');
         const dmConfirmationText = document.getElementById('dm-confirmation-text');
         const confirmDmButton = document.getElementById('confirm-dm-button');
-
+        
+        // Dropdown UI Elements (NEW)
+        const chatModeButton = document.getElementById('chat-mode-button');
+        const dmDropdownMenu = document.getElementById('dm-dropdown-menu'); 
+        const dmListContainer = document.getElementById('dm-list-container'); 
+        const noDmText = document.getElementById('no-dm-text'); 
+        const dropdownIcon = document.getElementById('dropdown-icon');
 
         // Recording state variables
         let mediaRecorder = null;
@@ -394,7 +430,7 @@
         let startTime = 0;
 
 
-        // --- DM/Chat Switching Logic (NEW) ---
+        // --- DM/Chat Switching Logic ---
 
         window.openDMConfirmationModal = function(recipientId, username) {
             if (recipientId === userId) {
@@ -434,7 +470,7 @@
             dmRecipientId = recipientId;
             dmRecipientUsername = username;
             updateHeader();
-            startMessageListener(); // Re-query/re-subscribe to filter for DMs
+            fetchCurrentMessages().then(renderMessages);
             document.getElementById('auth-message').textContent = `Now in private chat with ${username}.`;
         }
 
@@ -442,20 +478,106 @@
             dmRecipientId = null;
             dmRecipientUsername = null;
             updateHeader();
-            startMessageListener(); // Re-query/re-subscribe to filter for public chat
+            fetchCurrentMessages().then(renderMessages);
             document.getElementById('auth-message').textContent = 'Back in Public Chat.';
+        }
+        
+        window.toggleDMDropdown = function() {
+            if (dmRecipientId) return; // Cannot toggle dropdown if already in a DM
+
+            const isHidden = dmDropdownMenu.classList.contains('hidden');
+            
+            if (isHidden) {
+                // Show dropdown
+                renderDMList(); // Ensure the list is fresh before showing
+                dmDropdownMenu.classList.remove('hidden');
+                dropdownIcon.classList.add('rotate-180');
+            } else {
+                // Hide dropdown
+                dmDropdownMenu.classList.add('hidden');
+                dropdownIcon.classList.remove('rotate-180');
+            }
         }
 
         function updateHeader() {
+            // 1. Update the main button text based on current chat mode
             if (dmRecipientId) {
+                // In DM mode, show the partner's name
                 chatTitleElement.innerHTML = `Private Chat: 
                     <span class="text-yellow-400 font-bold">${dmRecipientUsername}</span> 
                     <button onclick="leaveDM()" class="ml-3 text-xs bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded-lg font-semibold">
                         Leave DM
                     </button>`;
+                
+                // Disable dropdown interaction
+                dropdownIcon.classList.add('hidden');
+                chatModeButton.classList.remove('hover:bg-blue-900/20');
+                chatModeButton.classList.add('cursor-default');
+
             } else {
+                // In Public Chat mode
                 chatTitleElement.textContent = 'Nexus Chat (Public)';
+                
+                // Enable dropdown interaction
+                dropdownIcon.classList.remove('hidden');
+                chatModeButton.classList.add('hover:bg-blue-900/20');
+                chatModeButton.classList.remove('cursor-default');
             }
+            
+            // 2. Close and re-render the dropdown if necessary
+            dmDropdownMenu.classList.add('hidden');
+            dropdownIcon.classList.remove('rotate-180');
+            // Do not call renderDMList here, it is called when opening the dropdown or by fetchActiveDMPartners
+        }
+        
+        function renderDMList() {
+            dmListContainer.innerHTML = '';
+            const partnerIds = Object.keys(activeDMPartners);
+
+            if (partnerIds.length === 0) {
+                noDmText.classList.remove('hidden');
+                return;
+            }
+            noDmText.classList.add('hidden');
+
+            // Sort partners by last message time (most recent first)
+            const sortedPartners = partnerIds.sort((a, b) => 
+                activeDMPartners[b].lastMessageTime.getTime() - activeDMPartners[a].lastMessageTime.getTime()
+            );
+
+            sortedPartners.forEach(partnerId => {
+                const partner = activeDMPartners[partnerId];
+                
+                // Determine if this partner is the current active DM
+                const isActive = partnerId === dmRecipientId;
+                const activeClass = isActive ? 'bg-blue-600/70 text-white' : 'hover:bg-blue-600/50 hover:text-white';
+                // Simple dot indicator
+                const statusIndicator = isActive 
+                    ? `<span class="mr-2 text-yellow-400">&#9679;</span>` 
+                    : `<span class="mr-2 text-gray-400">&#9679;</span>`; 
+
+                const dmItem = document.createElement('a');
+                dmItem.href = '#';
+                dmItem.className = `flex items-center px-4 py-2 text-sm text-gray-100 transition duration-150 ${activeClass} truncate`;
+                dmItem.role = 'menuitem';
+                dmItem.title = `DM with ${partner.username}`;
+                dmItem.onclick = (e) => {
+                    e.preventDefault();
+                    if (!isActive) {
+                        startDM(partnerId, partner.username);
+                    }
+                    toggleDMDropdown();
+                };
+
+                const time = partner.lastMessageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                dmItem.innerHTML = `
+                    ${statusIndicator}
+                    <span class="flex-grow">${partner.username}</span>
+                    <span class="text-xs text-gray-400 ml-2">${time}</span>
+                `;
+                dmListContainer.appendChild(dmItem);
+            });
         }
 
 
@@ -798,17 +920,6 @@
             }, 50); // Small delay to ensure rendering completes
         }
 
-        // Appends a single message element to the list and scrolls.
-        function appendMessage(msg) {
-             // Since we use handleSearchInput for rendering updates, direct append is usually done only for local quick feedback or initial render.
-             // We will rely on handleSearchInput (triggered by realtime) for the main rendering flow.
-             const messageExists = document.getElementById(`message-${msg.id}`);
-             if (!messageExists) {
-                messageList.appendChild(createMessageElement(msg));
-                scrollToBottom();
-             }
-        }
-
         // Removes a message element from the DOM.
         function removeMessageElement(messageId) {
             const element = document.getElementById(`message-${messageId}`);
@@ -818,9 +929,10 @@
         }
 
 
-        // --- Message Searching/Filtering Logic (UPDATED for DM) ---
+        // --- Message Searching/Filtering Logic ---
 
-        async function fetchInitialMessages() {
+        // Renamed function to reflect that it fetches messages for the *current* mode (public or DM)
+        async function fetchCurrentMessages() {
              let query = supabaseClient
                 .from(MESSAGES_TABLE_NAME)
                 .select('*')
@@ -841,13 +953,58 @@
             const { data, error } = await query;
 
             if (error) {
-                console.error("Error fetching initial messages:", error);
+                console.error("Error fetching messages:", error);
                 return [];
             }
             // Store fetched messages globally
             allMessages = data;
             return data;
         }
+        
+        // NEW: Function to fetch all DM metadata to populate the dropdown
+        async function fetchActiveDMPartners() {
+            if (!userId) {
+                activeDMPartners = {};
+                renderDMList();
+                return;
+            }
+
+            // Fetch messages where recipient_id is not null AND involves current user
+            // Select only the data needed to identify the partner and sort (last message time)
+            const { data, error } = await supabaseClient
+                .from(MESSAGES_TABLE_NAME)
+                .select('sender_id, recipient_id, created_at')
+                .not('recipient_id', 'is', null) // Must be a DM
+                .or(`sender_id.eq.${userId},recipient_id.eq.${userId}`) // Involves me
+                .order('created_at', { ascending: false }); 
+
+            if (error) {
+                console.error("Error fetching DM messages for list:", error);
+                return;
+            }
+            
+            const partners = {};
+            
+            // Iterate through the messages to find unique partners and their last message time
+            data.forEach(msg => {
+                const partnerId = msg.sender_id === userId ? msg.recipient_id : msg.sender_id;
+                
+                // Ensure we only process DMs with other users, and only process each partner once (due to the descending order query)
+                if (partnerId && partnerId !== userId && !partners[partnerId]) {
+                    const partnerProfile = userProfiles[partnerId] || {};
+                    if (partnerProfile.username) {
+                        partners[partnerId] = {
+                            username: partnerProfile.username,
+                            lastMessageTime: new Date(msg.created_at)
+                        };
+                    }
+                }
+            });
+            
+            activeDMPartners = partners;
+            renderDMList(); // Update the dropdown content
+        }
+
 
         function renderMessages(messagesToRender) {
             messageList.innerHTML = ''; 
@@ -1081,7 +1238,7 @@
         }
 
 
-        // --- Supabase Auth and Realtime Logic (Updated for DM) ---
+        // --- Supabase Auth and Realtime Logic ---
         
         window.toggleSettingsModal = function() {
             const modalContent = settingsModal.children[0];
@@ -1126,7 +1283,8 @@
                     startMessageListener();
                 } else {
                     // If returning to session, re-fetch based on current chat mode (public/DM)
-                    startMessageListener(); 
+                    fetchCurrentMessages().then(renderMessages);
+                    fetchActiveDMPartners(); 
                 }
                 updateHeader();
 
@@ -1143,6 +1301,7 @@
                 userProfiles = {}; 
                 allMessages = []; // Clear stored messages
                 dmRecipientId = null; // Reset DM state
+                activeDMPartners = {}; // Clear DM partners list
                 
                 if (realTimeChannel) {
                     // Keep the channel open, but clear chat view
@@ -1211,7 +1370,12 @@
             profileMessage.textContent = 'Profile saved successfully!';
             
             userProfiles[userId] = { username: newUsername, avatar_url: newAvatarUrl };
-            startMessageListener(); 
+            
+            // Re-fetch profiles, current messages, and DM partners to reflect new username immediately
+            fetchProfiles().then(() => {
+                fetchCurrentMessages().then(renderMessages);
+                fetchActiveDMPartners(); 
+            });
             
             setTimeout(() => {
                 toggleSettingsModal();
@@ -1276,9 +1440,11 @@
         }
         
         function startMessageListener() {
-            // 1. Fetch all currently visible messages (public OR DM)
-            fetchInitialMessages().then(initialMessages => {
-                renderMessages(initialMessages); 
+            // 1. Fetch ALL relevant profiles, current messages, and DM partners.
+            fetchProfiles().then(() => {
+                // Need to wait for profiles to be loaded before we can properly filter/render
+                fetchCurrentMessages().then(renderMessages);
+                fetchActiveDMPartners(); // Initial fetch for dropdown
             });
 
             // 2. Setup Realtime Listener (only once)
@@ -1287,16 +1453,18 @@
                     .channel('public-chat')
                     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
                         // When a new message arrives, re-fetch and re-render to apply current DM/Search filter
-                        // This ensures new DMs or public messages show up only if the user is in that context
-                        fetchInitialMessages().then(renderMessages);
+                        fetchCurrentMessages().then(renderMessages);
+                        fetchActiveDMPartners(); // Update DM list on new message
                     })
                     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
                         // Update requires a re-fetch to ensure sorting and filtering are correct
-                        fetchInitialMessages().then(renderMessages);
+                        fetchCurrentMessages().then(renderMessages);
+                        fetchActiveDMPartners(); // Update DM list on edit
                     })
                     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
                          // Deletion requires a re-fetch to ensure the remaining list is correct
-                        fetchInitialMessages().then(renderMessages);
+                        fetchCurrentMessages().then(renderMessages);
+                        fetchActiveDMPartners(); // Update DM list on deletion
                     })
                     .subscribe();
             }
