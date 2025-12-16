@@ -356,12 +356,6 @@
         // --- Supabase Configuration (***REPLACE THESE WITH YOUR ACTUAL KEYS***) ---
         const SUPABASE_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co'; 
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhraXF1b2FzbWRod3pheXZ0amlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2ODcxMDMsImV4cCI6MjA4MTI2MzEwM30.T3MVzZia3HyJVqjF3tIKJcsZqmiiA6dBOpll-Tr84l4'; 
-      
-        supabaseClient = createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
-);
-
         const MESSAGES_TABLE_NAME = 'messages'; 
         const PROFILES_TABLE_NAME = 'profiles'; 
         // CRITICAL: This must match the bucket name you created in the Supabase Storage settings
@@ -476,7 +470,7 @@
                 notificationPermission = Notification.permission;
             }
         }
-        
+
         /**
          * Displays a native browser notification (only when tab is in background).
          */
@@ -1418,46 +1412,9 @@
             }
         }
 
-// --- Supabase Auth and Realtime Logic ---
 
-window.handleAuth = async function (mode) {
-    const email = document.getElementById('auth-email').value.trim();
-    const password = document.getElementById('auth-password').value;
-
-    if (!email || !password) {
-        authMessage.textContent = 'Email and password required.';
-        return;
-    }
-
-    authMessage.textContent = 'Processing…';
-
-    let result;
-
-    if (mode === 'login') {
-        result = await supabaseClient.auth.signInWithPassword({
-            email,
-            password
-        });
-    } else {
-        result = await supabaseClient.auth.signUp({
-            email,
-            password
-        });
-    }
-
-    if (result.error) {
-        authMessage.textContent = result.error.message;
-        return;
-    }
-
-    authMessage.textContent = 'Success!';
-};
-     
-        window.handleLogout = async function () {
-    await supabaseClient.auth.signOut();
-};
-
-
+        // --- Supabase Auth and Realtime Logic ---
+        
         window.toggleSettingsModal = function() {
             const modalContent = settingsModal.children[0];
 
