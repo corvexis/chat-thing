@@ -45,7 +45,8 @@
 
             <!-- Title and Auth Status Bar -->
             <div class="border-b border-gray-700 pb-2 mb-4 flex justify-between items-center">
-                <h1 class="text-2xl font-bold text-blue-400">Nexus Chat</h1>
+                <!-- Updated Title to be dynamic -->
+                <h1 id="chat-title" class="text-2xl font-bold text-blue-400">Nexus Chat (Public)</h1>
                 <div id="user-status" class="flex items-center text-sm font-medium text-gray-400 p-2 bg-blue-900/30 rounded-lg space-x-3">
                     <button id="settings-button" onclick="toggleSettingsModal()"
                         class="hidden text-white hover:text-blue-300 transition duration-200 focus:outline-none" title="Profile Settings">
@@ -255,6 +256,27 @@
             </div>
         </div>
     </div>
+
+    <!-- ---------------------------------------------------- -->
+    <!-- DM CONFIRMATION MODAL (NEW) -->
+    <!-- ---------------------------------------------------- -->
+    <div id="dm-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
+        <div class="bg-gray-800 rounded-xl p-8 shadow-2xl w-full max-w-sm mx-4 border border-blue-700 transform transition-all duration-300 scale-95 opacity-0">
+            <h3 class="text-xl font-bold mb-4 text-blue-400">Start Direct Message</h3>
+            <p id="dm-confirmation-text" class="text-gray-300 mb-6"></p>
+            <div class="flex justify-end space-x-3">
+                <button onclick="closeDMConfirmationModal()"
+                    class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-xl transition duration-200">
+                    Cancel
+                </button>
+                <button id="confirm-dm-button" data-recipient-id="" data-username=""
+                    onclick="confirmDMStart()"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition duration-200">
+                    Start DM
+                </button>
+            </div>
+        </div>
+    </div>
     
     <!-- ---------------------------------------------------- -->
     <!-- VOICE MESSAGE RECORDING MODAL (New Recording Interface) -->
@@ -314,7 +336,11 @@
         // JS State Variables for Editing and Filtering
         let allMessages = []; // To store all messages for filtering/searching
         let isEditingMessageId = null; // Track message currently being edited
-        let isSearchActive = false; // NEW: State to track search input visibility
+        let isSearchActive = false; // State to track search input visibility
+
+        // DM State Variables (NEW)
+        let dmRecipientId = null; // null for public chat, user ID for DM
+        let dmRecipientUsername = null; 
 
         // UI Elements
         const authScreen = document.getElementById('auth-screen');
@@ -329,10 +355,10 @@
         const settingsModal = document.getElementById('settings-modal');
         const settingsButton = document.getElementById('settings-button');
         
-        // Search Elements (UPDATED)
-        const searchInputContainer = document.getElementById('search-input-container'); // NEW
+        // Search Elements 
+        const searchInputContainer = document.getElementById('search-input-container'); 
         const searchInput = document.getElementById('search-input');
-        const searchToggleBtn = document.getElementById('search-toggle-btn'); // NEW
+        const searchToggleBtn = document.getElementById('search-toggle-btn'); 
 
         // Media UI elements
         const mediaInput = document.getElementById('media-input');
@@ -353,6 +379,13 @@
         const recordStopBtn = document.getElementById('record-stop-btn');
         const recordMessageStatus = document.getElementById('record-message-status');
 
+        // DM UI Elements (NEW)
+        const chatTitleElement = document.getElementById('chat-title');
+        const dmModal = document.getElementById('dm-modal');
+        const dmConfirmationText = document.getElementById('dm-confirmation-text');
+        const confirmDmButton = document.getElementById('confirm-dm-button');
+
+
         // Recording state variables
         let mediaRecorder = null;
         let audioChunks = [];
@@ -361,7 +394,72 @@
         let startTime = 0;
 
 
-        // --- Voice Recording Logic ---
+        // --- DM/Chat Switching Logic (NEW) ---
+
+        window.openDMConfirmationModal = function(recipientId, username) {
+            if (recipientId === userId) {
+                document.getElementById('auth-message').textContent = "You can't DM yourself, silly! But you can use the chat for notes.";
+                return;
+            }
+            
+            dmConfirmationText.textContent = `Do you want to start a private conversation with ${username}?`;
+            confirmDmButton.dataset.recipientId = recipientId;
+            confirmDmButton.dataset.username = username;
+            
+            const modalContent = dmModal.children[0];
+            dmModal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        window.closeDMConfirmationModal = function() {
+            const modalContent = dmModal.children[0];
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                dmModal.classList.add('hidden');
+            }, 300);
+        }
+
+        window.confirmDMStart = function() {
+            const recipientId = confirmDmButton.dataset.recipientId;
+            const username = confirmDmButton.dataset.username;
+            closeDMConfirmationModal();
+            startDM(recipientId, username);
+        }
+
+        function startDM(recipientId, username) {
+            dmRecipientId = recipientId;
+            dmRecipientUsername = username;
+            updateHeader();
+            startMessageListener(); // Re-query/re-subscribe to filter for DMs
+            document.getElementById('auth-message').textContent = `Now in private chat with ${username}.`;
+        }
+
+        window.leaveDM = function() {
+            dmRecipientId = null;
+            dmRecipientUsername = null;
+            updateHeader();
+            startMessageListener(); // Re-query/re-subscribe to filter for public chat
+            document.getElementById('auth-message').textContent = 'Back in Public Chat.';
+        }
+
+        function updateHeader() {
+            if (dmRecipientId) {
+                chatTitleElement.innerHTML = `Private Chat: 
+                    <span class="text-yellow-400 font-bold">${dmRecipientUsername}</span> 
+                    <button onclick="leaveDM()" class="ml-3 text-xs bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded-lg font-semibold">
+                        Leave DM
+                    </button>`;
+            } else {
+                chatTitleElement.textContent = 'Nexus Chat (Public)';
+            }
+        }
+
+
+        // --- Voice Recording Logic (Unchanged) ---
         
         window.openRecordModal = function() {
             if (!userId) {
@@ -546,6 +644,7 @@
                     sender_id: userId,
                     text: `[Voice Recording (${recordTime.textContent})]`, 
                     media_url: mediaUrl, 
+                    recipient_id: dmRecipientId // <--- DM LOGIC
                 };
 
                 const { data: insertedMsg, error: insertError } = await supabaseClient
@@ -559,9 +658,7 @@
                 }
                 
                 recordMessageStatus.textContent = "Voice message sent!";
-                // Realtime listener handles rendering, but we can append locally for quicker feedback
-                // appendMessage(insertedMsg); 
-
+                
                 setTimeout(() => closeRecordModal(), 1000);
 
             } catch (error) {
@@ -662,6 +759,16 @@
                 </div>
             ` : '';
 
+            // Avatar with DM handler (UPDATED)
+            const avatar = `
+                <img class="w-8 h-8 rounded-full object-cover border border-gray-600 cursor-pointer hover:border-blue-400 transition" 
+                    src="${avatarUrl}" 
+                    alt="${senderName}"
+                    title="Start DM with ${senderName}"
+                    onclick="openDMConfirmationModal('${msg.sender_id}', '${senderName}')"
+                    onerror="this.onerror=null;this.src='https://placehold.co/40x40/3B82F6/ffffff?text=U';" />
+            `;
+
             messageElement.innerHTML = `
                 <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-xs md:max-w-md group">
                     <div class="text-xs ${isMe ? 'text-gray-400 mr-2' : 'text-blue-400 ml-2'} font-semibold truncate max-w-[150px] md:max-w-[200px]" title="${msg.sender_id}">
@@ -669,11 +776,8 @@
                     </div>
                     
                     <div class="flex ${isMe ? 'flex-row-reverse' : 'flex-row'} items-start mt-1 space-x-2 ${isMe ? 'space-x-reverse' : ''}">
-                        <!-- Avatar -->
-                        <img class="w-8 h-8 rounded-full object-cover border border-gray-600" 
-                            src="${avatarUrl}" 
-                            alt="${senderName}"
-                            onerror="this.onerror=null;this.src='https://placehold.co/40x40/3B82F6/ffffff?text=U';" />
+                        <!-- Avatar (Now Clickable for DM) -->
+                        ${avatar}
 
                         <!-- Message Bubble -->
                         <div class="message-bubble relative ${isMe ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-100 border border-gray-600'} rounded-xl p-3 shadow-md">
@@ -714,13 +818,27 @@
         }
 
 
-        // --- Message Searching/Filtering Logic (UPDATED) ---
+        // --- Message Searching/Filtering Logic (UPDATED for DM) ---
 
         async function fetchInitialMessages() {
-             const { data, error } = await supabaseClient
+             let query = supabaseClient
                 .from(MESSAGES_TABLE_NAME)
                 .select('*')
                 .order('created_at', { ascending: true }); 
+
+            if (dmRecipientId) {
+                // DM Query: sender is me AND recipient is them OR sender is them AND recipient is me
+                const myId = userId;
+                const theirId = dmRecipientId;
+                
+                // Using .or() for the complex filter: (me->them) OR (them->me)
+                query = query.or(`and(sender_id.eq.${myId},recipient_id.eq.${theirId}),and(sender_id.eq.${theirId},recipient_id.eq.${myId})`);
+            } else {
+                // Public Chat Query: recipient_id is null
+                query = query.is('recipient_id', null);
+            }
+            
+            const { data, error } = await query;
 
             if (error) {
                 console.error("Error fetching initial messages:", error);
@@ -762,7 +880,7 @@
             renderMessages(filteredMessages);
         }
         
-        // UPDATED: Function to toggle search input visibility and button styling
+        // Function to toggle search input visibility and button styling
         window.toggleSearchInput = function() {
             isSearchActive = !isSearchActive;
 
@@ -781,7 +899,7 @@
         }
         
         
-        // --- Message Editing Logic (NEW) ---
+        // --- Message Editing Logic (Unchanged) ---
         
         window.openEditModal = function(messageId, currentText) {
             if (!userId) {
@@ -828,6 +946,7 @@
             
             editMessageStatus.textContent = 'Saving changes...';
 
+            // IMPORTANT: Setting created_at to now pushes the edited message to the bottom
             const { error } = await supabaseClient
                 .from(MESSAGES_TABLE_NAME)
                 .update({ text: newText, edited: true, created_at: new Date().toISOString() }) 
@@ -846,7 +965,7 @@
         }
 
 
-        // --- Media Handling (Image only) ---
+        // --- Media Handling (Image only) (Unchanged) ---
 
         window.clearImagePreview = function() {
             pendingMediaFile = null;
@@ -890,7 +1009,7 @@
             return `${userId}/${timestamp}_${crypto.randomUUID()}.${fileExtension}`;
         }
         
-        // Updated sendMessage function to handle text OR image upload to Storage
+        // Updated sendMessage function to handle text OR image AND DM context
         window.sendMessage = async function() {
             const text = messageInput.value.trim();
             const file = pendingMediaFile; // File object
@@ -933,7 +1052,8 @@
                     sender_id: userId,
                     text: text || null, 
                     media_url: mediaUrl, 
-                    edited: false // New field for edited status
+                    edited: false,
+                    recipient_id: dmRecipientId // <--- CRITICAL DM LOGIC ADDITION
                 };
 
                 const { data, error: insertError } = await supabaseClient
@@ -949,8 +1069,6 @@
                 document.getElementById('auth-message').textContent = '';
                 console.log("SENDER: Message successfully inserted. Appending locally for instant display:", data);
                 
-                // Realtime listener handles rendering, but clear input immediately
-                
                 // Reset inputs and media state
                 messageInput.value = '';
                 clearImagePreview();
@@ -963,7 +1081,7 @@
         }
 
 
-        // --- Supabase Auth and Realtime Logic ---
+        // --- Supabase Auth and Realtime Logic (Updated for DM) ---
         
         window.toggleSettingsModal = function() {
             const modalContent = settingsModal.children[0];
@@ -1006,7 +1124,11 @@
 
                 if (!realTimeChannel) {
                     startMessageListener();
+                } else {
+                    // If returning to session, re-fetch based on current chat mode (public/DM)
+                    startMessageListener(); 
                 }
+                updateHeader();
 
             } else {
                 userId = null;
@@ -1020,11 +1142,12 @@
                 messageList.innerHTML = ''; 
                 userProfiles = {}; 
                 allMessages = []; // Clear stored messages
+                dmRecipientId = null; // Reset DM state
                 
                 if (realTimeChannel) {
-                    supabaseClient.removeChannel(realTimeChannel);
-                    realTimeChannel = null;
+                    // Keep the channel open, but clear chat view
                 }
+                updateHeader();
             }
         }
         
@@ -1153,51 +1276,30 @@
         }
         
         function startMessageListener() {
+            // 1. Fetch all currently visible messages (public OR DM)
             fetchInitialMessages().then(initialMessages => {
-                // Initial render uses all fetched messages
                 renderMessages(initialMessages); 
             });
 
-            if (realTimeChannel) {
-                supabaseClient.removeChannel(realTimeChannel);
+            // 2. Setup Realtime Listener (only once)
+            if (!realTimeChannel) {
+                realTimeChannel = supabaseClient
+                    .channel('public-chat')
+                    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
+                        // When a new message arrives, re-fetch and re-render to apply current DM/Search filter
+                        // This ensures new DMs or public messages show up only if the user is in that context
+                        fetchInitialMessages().then(renderMessages);
+                    })
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
+                        // Update requires a re-fetch to ensure sorting and filtering are correct
+                        fetchInitialMessages().then(renderMessages);
+                    })
+                    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
+                         // Deletion requires a re-fetch to ensure the remaining list is correct
+                        fetchInitialMessages().then(renderMessages);
+                    })
+                    .subscribe();
             }
-
-            realTimeChannel = supabaseClient
-                .channel('public-chat')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
-                    const newMessage = payload.new;
-                    if (!newMessage || !newMessage.sender_id) return;
-
-                    // Sync global state
-                    allMessages.push(newMessage);
-                    
-                    // Re-render based on current search term
-                    handleSearchInput(); 
-                })
-                .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
-                    const updatedMessage = payload.new;
-                    if (!updatedMessage || !updatedMessage.sender_id) return;
-
-                    // Sync global state: Find and replace the old message
-                    const index = allMessages.findIndex(m => m.id === updatedMessage.id);
-                    if (index > -1) {
-                        allMessages[index] = updatedMessage;
-                    }
-
-                    // Re-render based on current search term
-                    handleSearchInput(); 
-                })
-                .on('postgres_changes', { event: 'DELETE', schema: 'public', table: MESSAGES_TABLE_NAME }, (payload) => {
-                    const deletedId = payload.old.id;
-                    if (deletedId) {
-                        // Sync global state
-                        allMessages = allMessages.filter(m => m.id !== deletedId);
-                        
-                        // Re-render based on current search term
-                        handleSearchInput(); 
-                    }
-                })
-                .subscribe();
         }
 
         function initializeSupabase() {
@@ -1220,6 +1322,7 @@
             // Voice recording handlers (already present)
             recordStartBtn.onclick = startRecording;
             recordStopBtn.onclick = stopRecording;
+            updateHeader(); // Set initial public chat title
         });
 
 
