@@ -3,140 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aether Chat | Pro Edition</title>
+    <title>Aether | Cyberspace Messaging</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script type="module" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap');
         
-        body { font-family: 'Inter', sans-serif; }
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-purple: #bc13fe;
+            --bg-dark: #050505;
+        }
 
-        .glass {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
+        body { 
+            font-family: 'JetBrains+Mono', monospace; 
+            background-color: var(--bg-dark);
+            color: #e2e8f0;
+        }
+
+        .cyber-border {
+            border: 1px solid rgba(0, 242, 255, 0.2);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.05);
+        }
+
+        .cyber-card {
+            background: rgba(15, 15, 15, 0.8);
+            backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        #chat-container::-webkit-scrollbar { width: 6px; }
+        .neon-text-blue { text-shadow: 0 0 8px var(--neon-blue); }
+        
+        #chat-container::-webkit-scrollbar { width: 4px; }
         #chat-container::-webkit-scrollbar-track { background: transparent; }
-        #chat-container::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        #chat-container::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 10px; }
 
-        .message-bubble:hover .action-btns { opacity: 1; }
+        .message-bubble { transition: all 0.2s ease; }
+        .message-bubble:hover { border-color: var(--neon-blue); }
+        .message-bubble:hover .msg-actions { opacity: 1; }
+
+        @keyframes pulse-border {
+            0% { border-color: rgba(0, 242, 255, 0.2); }
+            50% { border-color: rgba(0, 242, 255, 0.6); }
+            100% { border-color: rgba(0, 242, 255, 0.2); }
+        }
+        .recording-pulse { animation: pulse-border 1.5s infinite; }
     </style>
 </head>
-<body class="bg-[#0f172a] text-slate-200 h-screen overflow-hidden flex flex-col">
+<body class="h-screen overflow-hidden flex flex-col">
 
     <!-- Auth Overlay -->
-    <div id="auth-overlay" class="fixed inset-0 z-[100] flex items-center justify-center bg-[#020617]/95 transition-opacity duration-500">
-        <div class="glass p-8 rounded-2xl w-full max-w-md shadow-2xl border border-indigo-500/30">
-            <div class="text-center mb-8">
-                <div class="inline-flex p-3 bg-indigo-500/20 rounded-full mb-4">
-                    <i data-lucide="cloud-lightning" class="w-8 h-8 text-indigo-400"></i>
-                </div>
-                <h2 class="text-3xl font-bold text-white tracking-tight">Aether Chat</h2>
-                <p class="text-slate-400 mt-2">Sign in to the network</p>
+    <div id="auth-overlay" class="fixed inset-0 z-[100] flex items-center justify-center bg-black transition-opacity duration-700">
+        <div class="cyber-card p-10 rounded-none w-full max-w-md border-t-4 border-t-[#00f2ff]">
+            <div class="mb-10 text-center">
+                <h2 class="text-4xl font-bold tracking-tighter text-white neon-text-blue mb-2">AETHER_v2</h2>
+                <p class="text-[10px] text-cyan-500 uppercase tracking-[0.3em]">Encrypted Network Access</p>
             </div>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Username</label>
-                    <input type="text" id="login-user" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="corvexis or sylvexis">
+            <div class="space-y-6">
+                <div class="group">
+                    <label class="block text-[10px] text-cyan-700 uppercase mb-2 group-focus-within:text-cyan-400">Identity_Token</label>
+                    <input type="text" id="login-user" class="w-full bg-black/50 border border-cyan-900 rounded-none p-4 text-cyan-400 focus:border-cyan-400 outline-none transition-all placeholder-cyan-950" placeholder="corvexis / sylvexis">
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Passcode</label>
-                    <input type="password" id="login-pass" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="••••">
+                <div class="group">
+                    <label class="block text-[10px] text-cyan-700 uppercase mb-2 group-focus-within:text-cyan-400">Pass_Key</label>
+                    <input type="password" id="login-pass" class="w-full bg-black/50 border border-cyan-900 rounded-none p-4 text-cyan-400 focus:border-cyan-400 outline-none transition-all placeholder-cyan-950" placeholder="••••••••">
                 </div>
-                <button id="login-submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center space-x-2">
-                    <span>Connect to Aether</span>
-                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                <button id="login-submit" class="w-full py-4 bg-cyan-950 border border-cyan-400 text-cyan-400 font-bold hover:bg-cyan-400 hover:text-black transition-all uppercase text-sm tracking-widest">
+                    Initialize Session
                 </button>
-                <p id="auth-error" class="text-red-400 text-sm text-center hidden"></p>
+                <p id="auth-error" class="text-red-500 text-[10px] text-center uppercase tracking-widest hidden"></p>
             </div>
         </div>
     </div>
 
-    <!-- App Container -->
-    <div class="flex-grow flex flex-col max-w-6xl mx-auto w-full p-4 md:p-6 h-full overflow-hidden">
+    <!-- Header -->
+    <header class="h-16 cyber-card border-b border-white/10 flex items-center justify-between px-6 z-10">
+        <div class="flex items-center space-x-4">
+            <div class="w-2 h-2 bg-cyan-400 rounded-full animate-pulse shadow-[0_0_10px_#00f2ff]"></div>
+            <h1 class="text-xl font-bold tracking-tighter text-white">AETHER<span class="text-cyan-400">.NET</span></h1>
+        </div>
+        <div class="flex items-center space-x-6">
+            <div class="text-right">
+                <p id="nav-username" class="text-xs font-bold text-white uppercase tracking-tighter">...</p>
+                <p class="text-[9px] text-cyan-700 uppercase">Secure_Node</p>
+            </div>
+            <button onclick="location.reload()" class="text-cyan-900 hover:text-red-500 transition-colors">
+                <i data-lucide="power" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="flex-grow flex flex-col max-w-5xl mx-auto w-full relative overflow-hidden">
         
-        <!-- Navbar -->
-        <nav class="glass rounded-2xl p-4 mb-4 flex justify-between items-center shadow-xl">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
-                    <i data-lucide="zap" class="text-white"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold text-white">Aether Chat</h1>
-                    <div class="flex items-center text-[10px] text-green-400 uppercase tracking-widest font-bold">
-                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
-                        Secure Link Established
-                    </div>
-                </div>
-            </div>
-            
-            <div class="flex items-center space-x-4">
-                <div class="text-right hidden sm:block">
-                    <p id="nav-username" class="text-sm font-semibold text-white">...</p>
-                    <p class="text-[10px] text-slate-500 uppercase">Active Profile</p>
-                </div>
-                <button onclick="handleLogout()" class="p-2.5 rounded-xl hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition">
-                    <i data-lucide="log-out" class="w-5 h-5"></i>
-                </button>
-            </div>
-        </nav>
+        <!-- Messages -->
+        <div id="chat-container" class="flex-grow overflow-y-auto p-6 space-y-8 pb-32">
+            <!-- Dynamic Content -->
+        </div>
 
-        <!-- Chat Stream -->
-        <main class="flex-grow glass rounded-2xl flex flex-col overflow-hidden relative shadow-2xl">
-            <div id="chat-container" class="flex-grow overflow-y-auto p-6 space-y-6">
-                <!-- Messages -->
-            </div>
-
-            <!-- Status Indicator -->
-            <div id="status-bar" class="px-6 py-2 text-xs text-indigo-400 font-medium bg-indigo-500/5 hidden border-t border-indigo-500/10">
-                <span id="status-text"></span>
-            </div>
-
-            <!-- Composer -->
-            <div class="p-4 border-t border-white/5 bg-slate-900/50">
-                <div id="edit-banner" class="hidden bg-amber-500/10 border border-amber-500/20 p-2 rounded-lg mb-3 flex justify-between items-center text-xs">
-                    <span class="text-amber-400 flex items-center"><i data-lucide="edit-3" class="w-3 h-3 mr-2"></i> Editing message...</span>
-                    <button onclick="cancelEditing()" class="text-slate-400 hover:text-white">Cancel</button>
+        <!-- Composer Area -->
+        <div class="absolute bottom-6 left-6 right-6">
+            <div class="cyber-card p-2 rounded-none border border-white/10 shadow-2xl">
+                <!-- Edit Header -->
+                <div id="edit-banner" class="hidden px-4 py-2 border-b border-white/10 flex justify-between items-center">
+                    <span class="text-[10px] text-amber-500 uppercase tracking-widest flex items-center">
+                        <i data-lucide="edit" class="w-3 h-3 mr-2"></i> Modifying Data Packet
+                    </span>
+                    <button onclick="cancelEditing()" class="text-[10px] text-white/40 hover:text-white">Cancel</button>
                 </div>
 
-                <form id="chat-form" class="flex items-end space-x-3">
-                    <div class="flex-grow">
-                        <textarea id="message-input" rows="1" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none transition resize-none min-h-[48px] max-h-32 text-sm" placeholder="Send a message..."></textarea>
-                    </div>
-
-                    <div class="flex items-center space-x-2 pb-1">
-                        <input type="file" id="image-input" accept="image/*" class="hidden" onchange="handleImageSelect(this)">
-                        <button type="button" onclick="document.getElementById('image-input').click()" class="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition">
-                            <i data-lucide="image" class="w-5 h-5"></i>
+                <form id="chat-form" class="flex items-center space-x-2">
+                    <button type="button" onclick="document.getElementById('image-input').click()" class="p-4 text-cyan-700 hover:text-cyan-400 transition">
+                        <i data-lucide="plus-square" class="w-6 h-6"></i>
+                    </button>
+                    <input type="file" id="image-input" accept="image/*" class="hidden" onchange="handleImageUpload(this)">
+                    
+                    <textarea id="message-input" rows="1" class="flex-grow bg-transparent border-none p-4 text-sm text-white focus:ring-0 outline-none resize-none placeholder-white/20" placeholder="Input message string..."></textarea>
+                    
+                    <div class="flex items-center space-x-1 pr-2">
+                        <button type="button" id="voice-btn" onclick="toggleVoice()" class="p-4 text-red-900 hover:text-red-500 transition">
+                            <i data-lucide="mic" class="w-6 h-6"></i>
                         </button>
-                        <button type="button" id="voice-trigger" onclick="toggleVoiceModal()" class="p-3 bg-slate-800 hover:bg-slate-700 text-red-400 rounded-xl transition">
-                            <i data-lucide="mic" class="w-5 h-5"></i>
-                        </button>
-                        <button type="submit" class="p-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition shadow-lg shadow-indigo-600/20">
-                            <i data-lucide="send" id="send-icon" class="w-5 h-5"></i>
+                        <button type="submit" class="bg-cyan-400 text-black p-4 hover:bg-white transition-colors">
+                            <i data-lucide="chevron-right" id="send-icon" class="w-6 h-6"></i>
                         </button>
                     </div>
                 </form>
             </div>
-        </main>
+        </div>
     </div>
 
-    <!-- Recording Modal -->
-    <div id="voice-modal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-        <div class="glass p-8 rounded-3xl w-80 text-center">
-            <div id="voice-waves" class="flex justify-center items-center space-x-1 mb-6 h-12">
-                <div class="w-1 h-4 bg-red-500 rounded-full animate-bounce"></div>
-                <div class="w-1 h-8 bg-red-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                <div class="w-1 h-12 bg-red-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                <div class="w-1 h-6 bg-red-500 rounded-full animate-bounce" style="animation-delay: 0.3s"></div>
+    <!-- Voice Modal -->
+    <div id="voice-modal" class="hidden fixed inset-0 z-[120] flex items-center justify-center bg-black/95">
+        <div class="text-center">
+            <div class="w-32 h-32 rounded-full border-2 border-red-500/20 flex items-center justify-center mb-8 mx-auto recording-pulse">
+                <i data-lucide="mic" class="w-12 h-12 text-red-500"></i>
             </div>
-            <p id="voice-timer" class="text-4xl font-mono font-bold text-white mb-2">00:00</p>
-            <p class="text-xs text-slate-400 uppercase tracking-widest mb-8">Recording Audio</p>
-            <button id="stop-record" class="p-4 bg-red-600 rounded-full text-white shadow-xl shadow-red-600/20">
-                <i data-lucide="square" class="w-6 h-6"></i>
+            <p id="voice-timer" class="text-5xl font-light tracking-tighter text-white mb-4">00:00</p>
+            <p class="text-[10px] text-red-900 uppercase tracking-[0.5em] mb-12">Capturing Audio</p>
+            <button onclick="stopVoice()" class="px-10 py-4 border border-red-500 text-red-500 hover:bg-red-500 hover:text-black transition-all font-bold uppercase text-xs tracking-widest">
+                Terminate & Send
             </button>
         </div>
     </div>
@@ -144,66 +151,66 @@
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-        // Auto-detect environment variables
-        const SUPABASE_URL = typeof __supabase_url !== 'undefined' ? __supabase_url : 'https://hkiquoasmdhwzayvtjif.supabase.co';
-        const SUPABASE_ANON_KEY = typeof __supabase_key !== 'undefined' ? __supabase_key : '';
+        // --- HARDCODED CONFIG ---
+        const SB_URL = 'https://hkiquoasmdhwzayvtjif.supabase.co';
+        const SB_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Plug your Anon Key here
+        const supabase = createClient(SB_URL, SB_KEY);
 
-        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        let currentUser = null;
+        // --- STATE ---
+        let user = null;
         let editingId = null;
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let recordStartTime = null;
-        let timerInterval = null;
+        let recorder = null;
+        let chunks = [];
+        let timer = null;
 
-        async function handleLogin() {
-            const user = document.getElementById('login-user').value.trim();
-            const pass = document.getElementById('login-pass').value.trim();
-            const errorEl = document.getElementById('auth-error');
+        // --- AUTH ---
+        async function login() {
+            const u = document.getElementById('login-user').value.trim();
+            const p = document.getElementById('login-pass').value.trim();
+            const err = document.getElementById('auth-error');
 
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
-                .eq('username', user)
-                .eq('passcode', pass)
+                .eq('username', u)
+                .eq('passcode', p)
                 .single();
 
             if (error || !data) {
-                errorEl.innerText = "Access Denied: Invalid Username/Passcode";
-                errorEl.classList.remove('hidden');
+                err.innerText = "AUTH_FAILURE: DATA_MISMATCH";
+                err.classList.remove('hidden');
                 return;
             }
 
-            currentUser = data;
-            document.getElementById('auth-overlay').classList.add('hidden');
-            document.getElementById('nav-username').innerText = currentUser.username;
-            loadMessages();
-            subscribeToMessages();
+            user = data;
+            document.getElementById('auth-overlay').style.opacity = '0';
+            setTimeout(() => document.getElementById('auth-overlay').classList.add('hidden'), 700);
+            document.getElementById('nav-username').innerText = user.username;
+            
+            initChat();
         }
 
-        window.handleLogout = () => location.reload();
-
-        function createMessageHTML(msg) {
-            const isMe = msg.user_id === currentUser.id;
-            const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        // --- CHAT LOGIC ---
+        function createMsgUI(msg) {
+            const isMe = msg.user_id === user.id;
+            const time = new Date(msg.created_at).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
             
             return `
                 <div id="msg-${msg.id}" class="flex ${isMe ? 'justify-end' : 'justify-start'} group">
-                    <div class="max-w-[80%] ${isMe ? 'order-1' : 'order-2'}">
-                        <div class="flex items-center space-x-2 mb-1 px-1">
-                            <span class="text-[10px] font-bold text-slate-500 uppercase">${isMe ? 'You' : msg.username}</span>
-                            <span class="text-[9px] text-slate-600">${time} ${msg.is_edited ? '• EDITED' : ''}</span>
+                    <div class="max-w-[75%]">
+                        <div class="flex items-center space-x-3 mb-2 px-1">
+                            <span class="text-[9px] font-bold text-cyan-400 uppercase tracking-widest">${msg.username}</span>
+                            <span class="text-[9px] text-white/20">${time} ${msg.is_edited ? '[MOD]' : ''}</span>
                         </div>
-                        <div class="message-bubble relative p-3 rounded-2xl ${isMe ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-slate-800 text-slate-200 rounded-tl-none'} shadow-lg">
-                            ${msg.image_url ? `<img src="${msg.image_url}" class="rounded-lg max-h-64 object-cover mb-2" />` : ''}
-                            ${msg.audio_url ? `<audio controls src="${msg.audio_url}" class="h-8 w-48 invert grayscale brightness-200"></audio>` : ''}
-                            ${msg.text ? `<p class="text-sm">${msg.text}</p>` : ''}
+                        <div class="message-bubble relative cyber-card p-4 border border-white/5 ${isMe ? 'border-r-cyan-400 bg-cyan-400/5' : 'border-l-cyan-400'}">
+                            ${msg.image_url ? `<img src="${msg.image_url}" class="max-h-80 w-auto border border-white/10 mb-3" />` : ''}
+                            ${msg.audio_url ? `<audio src="${msg.audio_url}" controls class="w-full h-8 opacity-50 contrast-125 mb-2"></audio>` : ''}
+                            ${msg.text ? `<p class="text-sm leading-relaxed text-white/80">${msg.text}</p>` : ''}
                             
                             ${isMe ? `
-                                <div class="action-btns opacity-0 absolute top-0 -left-12 flex space-x-1 p-1 transition-opacity">
-                                    <button onclick="startEdit(${msg.id}, \`${msg.text ? msg.text.replace(/`/g, '\\`').replace(/\${/g, '\\${') : ''}\`)" class="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
-                                    <button onclick="deleteMessage(${msg.id})" class="p-1.5 hover:bg-red-500/20 rounded-lg text-slate-400 hover:text-red-400"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                <div class="msg-actions opacity-0 absolute -top-4 -right-2 flex space-x-1 transition-all">
+                                    <button onclick="editMsg(${msg.id}, \`${msg.text ? msg.text.replace(/`/g, '\\`').replace(/\${/g, '\\${') : ''}\`)" class="bg-black border border-white/10 p-2 text-cyan-400 hover:border-cyan-400"><i data-lucide="edit-3" class="w-3 h-3"></i></button>
+                                    <button onclick="deleteMsg(${msg.id})" class="bg-black border border-white/10 p-2 text-red-500 hover:border-red-500"><i data-lucide="trash" class="w-3 h-3"></i></button>
                                 </div>
                             ` : ''}
                         </div>
@@ -212,23 +219,20 @@
             `;
         }
 
-        async function loadMessages() {
+        async function initChat() {
             const { data } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
-            const container = document.getElementById('chat-container');
-            container.innerHTML = (data || []).map(createMessageHTML).join('');
+            document.getElementById('chat-container').innerHTML = (data || []).map(createMsgUI).join('');
             lucide.createIcons();
-            scrollToBottom();
-        }
+            scroll();
 
-        function subscribeToMessages() {
-            supabase.channel('public:messages')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, payload => {
+            supabase.channel('room1')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
                     if (payload.eventType === 'INSERT') {
-                        document.getElementById('chat-container').insertAdjacentHTML('beforeend', createMessageHTML(payload.new));
-                        scrollToBottom();
+                        document.getElementById('chat-container').insertAdjacentHTML('beforeend', createMsgUI(payload.new));
+                        scroll();
                     } else if (payload.eventType === 'UPDATE') {
-                        const el = document.getElementById(`msg-${payload.new.id}`);
-                        if (el) el.outerHTML = createMessageHTML(payload.new);
+                        const old = document.getElementById(`msg-${payload.new.id}`);
+                        if (old) old.outerHTML = createMsgUI(payload.new);
                     } else if (payload.eventType === 'DELETE') {
                         document.getElementById(`msg-${payload.old.id}`)?.remove();
                     }
@@ -236,38 +240,27 @@
                 }).subscribe();
         }
 
-        async function sendMessage(e) {
+        // --- ACTIONS ---
+        async function post(e) {
             e.preventDefault();
             const input = document.getElementById('message-input');
-            const text = input.value.trim();
-            if (!text && !editingId) return;
+            const txt = input.value.trim();
+            if (!txt && !editingId) return;
 
             if (editingId) {
-                await supabase.from('messages').update({ text, is_edited: true }).eq('id', editingId);
+                await supabase.from('messages').update({ text: txt, is_edited: true }).eq('id', editingId);
                 cancelEditing();
             } else {
-                await supabase.from('messages').insert({ 
-                    user_id: currentUser.id, 
-                    username: currentUser.username, 
-                    text 
-                });
+                await supabase.from('messages').insert({ user_id: user.id, username: user.username, text: txt });
+                input.value = '';
             }
-            input.value = '';
-            input.style.height = 'auto';
         }
 
-        window.deleteMessage = async (id) => {
-            if (confirm("Permanently delete message?")) {
-                await supabase.from('messages').delete().eq('id', id);
-            }
-        };
-
-        window.startEdit = (id, text) => {
+        window.editMsg = (id, text) => {
             editingId = id;
             const input = document.getElementById('message-input');
             input.value = text;
             input.focus();
-            input.style.height = (input.scrollHeight) + 'px';
             document.getElementById('edit-banner').classList.remove('hidden');
             document.getElementById('send-icon').setAttribute('data-lucide', 'check');
             lucide.createIcons();
@@ -276,108 +269,72 @@
         window.cancelEditing = () => {
             editingId = null;
             document.getElementById('message-input').value = '';
-            document.getElementById('message-input').style.height = 'auto';
             document.getElementById('edit-banner').classList.add('hidden');
-            document.getElementById('send-icon').setAttribute('data-lucide', 'send');
+            document.getElementById('send-icon').setAttribute('data-lucide', 'chevron-right');
             lucide.createIcons();
         };
 
-        window.handleImageSelect = async (input) => {
+        window.deleteMsg = async (id) => {
+            if (confirm("PURGE DATA PERMANENTLY?")) {
+                await supabase.from('messages').delete().eq('id', id);
+            }
+        };
+
+        window.handleImageUpload = async (input) => {
             const file = input.files[0];
             if (!file) return;
-
-            showStatus("Uploading Image...");
-            const fileName = `img-${Date.now()}`;
-            const { data } = await supabase.storage.from('media').upload(`images/${fileName}`, file);
-            
+            const path = `uploads/${Date.now()}-${file.name}`;
+            const { data } = await supabase.storage.from('media').upload(path, file);
             if (data) {
-                const { data: urlData } = supabase.storage.from('media').getPublicUrl(`images/${fileName}`);
-                await supabase.from('messages').insert({
-                    user_id: currentUser.id,
-                    username: currentUser.username,
-                    image_url: urlData.publicUrl
-                });
+                const { data: url } = supabase.storage.from('media').getPublicUrl(path);
+                await supabase.from('messages').insert({ user_id: user.id, username: user.username, image_url: url.publicUrl });
             }
-            hideStatus();
         };
 
-        window.toggleVoiceModal = async () => {
-            const modal = document.getElementById('voice-modal');
-            modal.classList.remove('hidden');
-            
+        // --- VOICE ---
+        window.toggleVoice = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-                
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                mediaRecorder.onstop = async () => {
-                    showStatus("Sending Voice...");
-                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const fileName = `voice-${Date.now()}.webm`;
-                    const { data } = await supabase.storage.from('media').upload(`audio/${fileName}`, blob);
-                    
+                recorder = new MediaRecorder(stream);
+                chunks = [];
+                recorder.ondataavailable = e => chunks.push(e.data);
+                recorder.onstop = async () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const path = `voice/${Date.now()}.webm`;
+                    const { data } = await supabase.storage.from('media').upload(path, blob);
                     if (data) {
-                        const { data: urlData } = supabase.storage.from('media').getPublicUrl(`audio/${fileName}`);
-                        await supabase.from('messages').insert({
-                            user_id: currentUser.id,
-                            username: currentUser.username,
-                            audio_url: urlData.publicUrl
-                        });
+                        const { data: url } = supabase.storage.from('media').getPublicUrl(path);
+                        await supabase.from('messages').insert({ user_id: user.id, username: user.username, audio_url: url.publicUrl });
                     }
-                    hideStatus();
                     stream.getTracks().forEach(t => t.stop());
                 };
-
-                mediaRecorder.start();
-                startTimer();
-            } catch (err) {
-                modal.classList.add('hidden');
-                console.error(err);
-            }
+                recorder.start();
+                document.getElementById('voice-modal').classList.remove('hidden');
+                let s = 0;
+                timer = setInterval(() => {
+                    s++;
+                    const min = Math.floor(s/60).toString().padStart(2, '0');
+                    const sec = (s%60).toString().padStart(2, '0');
+                    document.getElementById('voice-timer').innerText = `${min}:${sec}`;
+                }, 1000);
+            } catch (e) { console.error(e); }
         };
 
-        function startTimer() {
-            recordStartTime = Date.now();
-            timerInterval = setInterval(() => {
-                const diff = Math.floor((Date.now() - recordStartTime) / 1000);
-                const m = Math.floor(diff / 60).toString().padStart(2, '0');
-                const s = (diff % 60).toString().padStart(2, '0');
-                document.getElementById('voice-timer').innerText = `${m}:${s}`;
-            }, 1000);
-        }
-
-        document.getElementById('stop-record').onclick = () => {
-            if (mediaRecorder) mediaRecorder.stop();
-            if (timerInterval) clearInterval(timerInterval);
+        window.stopVoice = () => {
+            recorder.stop();
+            clearInterval(timer);
             document.getElementById('voice-modal').classList.add('hidden');
+            document.getElementById('voice-timer').innerText = "00:00";
         };
 
-        function scrollToBottom() {
-            const container = document.getElementById('chat-container');
-            container.scrollTop = container.scrollHeight;
+        function scroll() {
+            const c = document.getElementById('chat-container');
+            c.scrollTop = c.scrollHeight;
         }
 
-        function showStatus(text) {
-            const bar = document.getElementById('status-bar');
-            document.getElementById('status-text').innerText = text;
-            bar.classList.remove('hidden');
-        }
-
-        function hideStatus() {
-            document.getElementById('status-bar').classList.add('hidden');
-        }
-
-        document.getElementById('login-submit').onclick = handleLogin;
-        document.getElementById('chat-form').onsubmit = sendMessage;
-        
-        const textarea = document.getElementById('message-input');
-        textarea.oninput = () => {
-            textarea.style.height = 'auto';
-            textarea.style.height = (textarea.scrollHeight) + 'px';
-        };
-
+        document.getElementById('login-submit').onclick = login;
+        document.getElementById('chat-form').onsubmit = post;
         lucide.createIcons();
     </script>
 </body>
-</html>
+    </html>
