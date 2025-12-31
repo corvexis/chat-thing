@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>WHY</title>
+    <title>AETHER</title>
     
     <link rel="manifest" href="data:application/json;base64,ewogICJpZGVudGlmaWVyIjogImFldGhlci1tZXNzZW5nZXIiLAogICJuYW1lIjogIkFldGhlciIsCiAgInNob3J0X25hbWUiOiAiQWV0aGVyIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMxMjEyMTIiLAogICJ0aGVtZV9jb2xvciI6ICIjMTIxMjEyIgp9">
 
@@ -143,6 +143,7 @@
 
     <div id="toast-container"></div>
 
+    <!-- Login Screen -->
     <div id="auth-overlay" class="fixed inset-0 z-[300] bg-[#0a0a0a] flex items-center justify-center p-6">
         <div class="w-full max-w-sm text-center">
             <div class="mb-8 flex justify-center">
@@ -163,6 +164,7 @@
         </div>
     </div>
 
+    <!-- Calling Screen -->
     <div id="call-overlay" class="hidden fixed inset-0 z-[250] calling-bg flex flex-col items-center justify-between py-20 px-6 backdrop-blur-xl">
         <div class="text-center">
             <div class="w-32 h-32 bg-[#D0BCFF]/10 rounded-full flex items-center justify-center mx-auto mb-8 voice-pulse border border-[#D0BCFF]/30">
@@ -171,7 +173,9 @@
             <h2 id="call-status" class="text-xs uppercase tracking-[0.4em] text-[#D0BCFF] mb-2">Establishing Link</h2>
             <h1 id="call-user" class="text-3xl font-bold text-white">...</h1>
         </div>
+        
         <div class="flex flex-col gap-6 w-full max-w-xs">
+            <!-- Incoming Call UI -->
             <div id="incoming-actions" class="hidden flex gap-4">
                 <button id="answer-call" class="flex-1 py-4 bg-green-500 text-white rounded-full font-bold flex items-center justify-center gap-2 shadow-lg">
                     <i data-lucide="phone-forwarded" class="w-5 h-5"></i> Accept
@@ -180,6 +184,7 @@
                     <i data-lucide="phone-off" class="w-5 h-5"></i> End
                 </button>
             </div>
+            <!-- Outgoing/Ongoing Call UI -->
             <button id="end-call-btn" class="w-full py-4 bg-red-500/20 text-red-400 border border-red-500/30 rounded-full font-bold flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all">
                 <i data-lucide="x" class="w-5 h-5"></i> Disconnect
             </button>
@@ -188,6 +193,7 @@
         <audio id="ringtone" loop src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3"></audio>
     </div>
 
+    <!-- Main App -->
     <div id="app-content" class="flex flex-col h-full">
         <header class="px-4 sm:px-6 h-16 flex items-center justify-between bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-white/5 shrink-0 z-50">
             <div class="flex items-center gap-3">
@@ -244,8 +250,8 @@
         let callChannel = null;
         let mediaRecorder = null;
         let audioChunks = [];
+        let pendingOffer = null;
 
-        // Simplified WebRTC Config with a single reliable STUN/TURN provider
         const rtcConfig = {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
@@ -296,25 +302,105 @@
             setTimeout(() => { t.classList.add('opacity-0'); setTimeout(() => t.remove(), 500); }, 4000);
         };
 
+        // --- CALLING LOGIC ---
+
         async function startCall() {
             document.getElementById('call-overlay').classList.remove('hidden');
+            document.getElementById('incoming-actions').classList.add('hidden');
+            document.getElementById('end-call-btn').classList.remove('hidden');
+            document.getElementById('call-user').innerText = "Signal Broadcasted";
+            document.getElementById('call-status').innerText = "Establishing Link";
             document.getElementById('ringtone').play();
+            
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 peerConnection = new RTCPeerConnection(rtcConfig);
                 localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+                
                 peerConnection.ontrack = e => {
                     document.getElementById('remote-audio').srcObject = e.streams[0];
                     document.getElementById('ringtone').pause();
+                    document.getElementById('call-status').innerText = "Encrypted Connection Live";
                 };
+                
                 peerConnection.onicecandidate = e => {
-                    if (e.candidate) callChannel.send({ type: 'broadcast', event: 'ice-candidate', payload: e.candidate });
+                    if (e.candidate) {
+                        callChannel.send({ type: 'broadcast', event: 'ice-candidate', payload: { candidate: e.candidate, from: user.username } });
+                    }
                 };
+
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
                 callChannel.send({ type: 'broadcast', event: 'call-offer', payload: { offer, from: user.username } });
-            } catch (err) { endCall(); showToast("Mic Access Denied"); }
+            } catch (err) { 
+                console.error(err);
+                endCall(); 
+                showToast("Mic Access Denied"); 
+            }
         }
+
+        async function answerCall() {
+            if (!pendingOffer) return;
+            document.getElementById('incoming-actions').classList.add('hidden');
+            document.getElementById('end-call-btn').classList.remove('hidden');
+            document.getElementById('ringtone').pause();
+            
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                peerConnection = new RTCPeerConnection(rtcConfig);
+                localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+
+                peerConnection.ontrack = e => {
+                    document.getElementById('remote-audio').srcObject = e.streams[0];
+                };
+
+                peerConnection.onicecandidate = e => {
+                    if (e.candidate) {
+                        callChannel.send({ type: 'broadcast', event: 'ice-candidate', payload: { candidate: e.candidate, from: user.username } });
+                    }
+                };
+
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(pendingOffer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                callChannel.send({ type: 'broadcast', event: 'call-answer', payload: { answer, from: user.username } });
+                document.getElementById('call-status').innerText = "Connection Stabilized";
+            } catch (err) {
+                console.error(err);
+                endCall();
+            }
+        }
+
+        function declineCall() {
+            callChannel.send({ type: 'broadcast', event: 'call-end', payload: { from: user.username } });
+            endCall();
+        }
+
+        function endCall() {
+            // Send signal to other peer if it was a manual disconnect
+            if (arguments.length === 0 || arguments[0] !== 'remote') {
+                if (callChannel) callChannel.send({ type: 'broadcast', event: 'call-end', payload: { from: user.username } });
+            }
+
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
+            
+            document.getElementById('call-overlay').classList.add('hidden');
+            document.getElementById('incoming-actions').classList.add('hidden');
+            document.getElementById('remote-audio').srcObject = null;
+            document.getElementById('ringtone').pause();
+            document.getElementById('ringtone').currentTime = 0;
+            pendingOffer = null;
+        }
+
+        // --- AUTH & SIGNALLING SETUP ---
 
         async function login() {
             const u = document.getElementById('login-user').value.trim();
@@ -337,24 +423,32 @@
         function setupSignaling() {
             callChannel = supabase.channel('voice_signaling').on('broadcast', { event: 'call-offer' }, ({ payload }) => {
                 if (payload.from === user.username) return;
+                pendingOffer = payload.offer;
                 document.getElementById('call-overlay').classList.remove('hidden');
                 document.getElementById('call-user').innerText = payload.from;
+                document.getElementById('call-status').innerText = "Incoming Encrypted Stream";
                 document.getElementById('incoming-actions').classList.remove('hidden');
+                document.getElementById('end-call-btn').classList.add('hidden');
                 document.getElementById('ringtone').play();
-                window.pendingOffer = payload.offer;
             }).on('broadcast', { event: 'call-answer' }, async ({ payload }) => {
-                if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(payload));
+                if (payload.from === user.username) return;
+                if (peerConnection) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(payload.answer));
+                }
             }).on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
-                if (peerConnection) await peerConnection.addIceCandidate(new RTCIceCandidate(payload));
-            }).on('broadcast', { event: 'call-end' }, () => endCall()).subscribe();
+                if (payload.from === user.username) return;
+                if (peerConnection) {
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(payload.candidate));
+                    } catch (e) { console.warn("ICE Error", e); }
+                }
+            }).on('broadcast', { event: 'call-end' }, ({ payload }) => {
+                if (payload.from === user.username) return;
+                endCall('remote');
+            }).subscribe();
         }
 
-        function endCall() {
-            if (peerConnection) peerConnection.close();
-            if (localStream) localStream.getTracks().forEach(t => t.stop());
-            document.getElementById('call-overlay').classList.add('hidden');
-            document.getElementById('ringtone').pause();
-        }
+        // --- MESSAGING LOGIC ---
 
         async function initApp() {
             const { data } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
@@ -383,20 +477,20 @@
             </div>`;
         }
 
-        // --- IMAGE SEND FIX ---
+        // Event Listeners
         document.getElementById('plus-btn').onclick = () => document.getElementById('file-input').click();
+        
         document.getElementById('file-input').onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
             showToast("Encrypting Image...", false);
             const name = `${Date.now()}_${file.name}`;
-            const { data, error } = await supabase.storage.from('media').upload(name, file);
+            const { error } = await supabase.storage.from('media').upload(name, file);
             if (error) return showToast("Upload Failed");
             const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(name);
             await supabase.from('messages').insert({ user_id: user.id, username: user.username, image_url: publicUrl });
         };
 
-        // --- VOICE MESSAGE SEND FIX ---
         const micBtn = document.getElementById('voice-trigger');
         const micIcon = document.getElementById('mic-icon');
         micBtn.onclick = async () => {
@@ -409,7 +503,7 @@
                     showToast("Sending Signal...", false);
                     const blob = new Blob(audioChunks, { type: 'audio/webm' });
                     const name = `voice_${Date.now()}.webm`;
-                    const { data, error } = await supabase.storage.from('media').upload(name, blob);
+                    const { error } = await supabase.storage.from('media').upload(name, blob);
                     if (!error) {
                         const { data: { publicUrl } } = supabase.storage.from('media').getPublicUrl(name);
                         await supabase.from('messages').insert({ user_id: user.id, username: user.username, audio_url: publicUrl });
@@ -436,9 +530,14 @@
             input.value = '';
         };
 
+        // Call UI Bindings
         document.getElementById('login-btn').onclick = login;
         document.getElementById('start-call-btn').onclick = startCall;
+        document.getElementById('end-call-btn').onclick = endCall;
+        document.getElementById('answer-call').onclick = answerCall;
+        document.getElementById('decline-call').onclick = declineCall;
         document.getElementById('logout-btn').onclick = () => { localStorage.clear(); location.reload(); };
+
         window.onload = runIntro;
     </script>
 </body>
