@@ -12,10 +12,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap');
         
         :root {
-            --md-surface: #121212;
+            --md-surface: #0a0a0a;
             --md-surface-container: #1E1E1E;
             --md-primary: #D0BCFF;
             --md-on-primary: #381E72;
@@ -33,6 +33,85 @@
             height: 100vh;
             height: 100dvh;
             padding-top: env(safe-area-inset-top);
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* --- INTRO ANIMATIONS --- */
+        #intro-screen {
+            background-color: #000;
+            font-family: 'JetBrains Mono', monospace;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+
+        .terminal-text {
+            color: #D0BCFF;
+            text-shadow: 0 0 8px rgba(208, 188, 255, 0.5);
+        }
+
+        .glitch {
+            position: relative;
+        }
+
+        .glitch::before, .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: black;
+        }
+
+        .glitch::before {
+            left: 2px;
+            text-shadow: -2px 0 #ff00c1;
+            clip: rect(44px, 450px, 56px, 0);
+            animation: glitch-anim 5s infinite linear alternate-reverse;
+        }
+
+        .glitch::after {
+            left: -2px;
+            text-shadow: -2px 0 #00fff9, 2px 2px #ff00c1;
+            animation: glitch-anim2 1s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim {
+            0% { clip: rect(31px, 9999px, 94px, 0); }
+            20% { clip: rect(62px, 9999px, 42px, 0); }
+            40% { clip: rect(16px, 9999px, 78px, 0); }
+            60% { clip: rect(82px, 9999px, 12px, 0); }
+            80% { clip: rect(54px, 9999px, 66px, 0); }
+            100% { clip: rect(96px, 9999px, 23px, 0); }
+        }
+
+        @keyframes glitch-anim2 {
+            0% { clip: rect(65px, 9999px, 100px, 0); }
+            20% { clip: rect(12px, 9999px, 56px, 0); }
+            40% { clip: rect(88px, 9999px, 12px, 0); }
+            60% { clip: rect(4px, 9999px, 88px, 0); }
+            80% { clip: rect(33px, 9999px, 21px, 0); }
+            100% { clip: rect(77px, 9999px, 94px, 0); }
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 501;
+            background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(208, 188, 255, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
+            opacity: 0.1;
+            position: absolute;
+            bottom: 100%;
+            animation: scanline 6s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            80% { bottom: 100%; }
+            100% { bottom: -100px; }
         }
 
         .m3-card {
@@ -94,20 +173,30 @@
             #toast-container { left: auto; width: auto; align-items: flex-end; }
         }
 
-        #app-content { display: none; }
+        #app-content, #auth-overlay { display: none; }
 
-        /* Calling Animation */
         .calling-bg {
             background: radial-gradient(circle at center, #2e1a4a 0%, #121212 100%);
         }
     </style>
 </head>
-<body class="flex flex-col overflow-hidden">
+<body class="flex flex-col">
+
+    <div class="scanline pointer-events-none"></div>
+
+    <div id="intro-screen" class="fixed inset-0 flex flex-col items-center justify-center p-12">
+        <div class="terminal-text text-sm mb-4" id="terminal-loader">
+            > INITIALIZING SECURE LINK...
+        </div>
+        <div class="glitch text-5xl font-bold tracking-tighter" data-text="AETHER" id="intro-logo">AETHER</div>
+        <div class="w-48 h-1 bg-[#D0BCFF]/20 mt-8 rounded-full overflow-hidden">
+            <div id="intro-progress" class="h-full bg-[#D0BCFF] w-0 transition-all duration-300"></div>
+        </div>
+    </div>
 
     <div id="toast-container"></div>
 
-    <!-- Auth Overlay -->
-    <div id="auth-overlay" class="fixed inset-0 z-[300] bg-[#121212] flex items-center justify-center p-6">
+    <div id="auth-overlay" class="fixed inset-0 z-[300] bg-[#0a0a0a] flex items-center justify-center p-6">
         <div class="w-full max-w-sm text-center">
             <div class="mb-8 flex justify-center">
                 <div class="w-16 h-16 bg-[#D0BCFF] rounded-3xl flex items-center justify-center rotate-12 shadow-2xl">
@@ -128,7 +217,6 @@
         </div>
     </div>
 
-    <!-- Call Overlay -->
     <div id="call-overlay" class="hidden fixed inset-0 z-[250] calling-bg flex flex-col items-center justify-between py-20 px-6 backdrop-blur-xl">
         <div class="text-center">
             <div class="w-32 h-32 bg-[#D0BCFF]/10 rounded-full flex items-center justify-center mx-auto mb-8 voice-pulse border border-[#D0BCFF]/30">
@@ -152,14 +240,12 @@
             </button>
         </div>
         
-        <!-- Audio elements -->
         <audio id="remote-audio" autoplay></audio>
         <audio id="ringtone" loop src="https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3"></audio>
     </div>
 
-    <!-- Main App Content -->
     <div id="app-content" class="flex flex-col h-full">
-        <header class="px-4 sm:px-6 h-16 flex items-center justify-between bg-[#121212]/90 backdrop-blur-xl border-b border-white/5 shrink-0 z-50">
+        <header class="px-4 sm:px-6 h-16 flex items-center justify-between bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-white/5 shrink-0 z-50">
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 bg-[#4F378B] rounded-lg flex items-center justify-center">
                     <i data-lucide="layers" class="text-[#D0BCFF] w-5 h-5"></i>
@@ -209,20 +295,6 @@
         </main>
     </div>
 
-    <!-- Voice Recording Modal -->
-    <div id="voice-overlay" class="hidden fixed inset-0 z-[150] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
-        <div class="bg-[#1E1E1E] rounded-[32px] p-8 w-full max-w-xs text-center border border-white/10 shadow-2xl">
-            <div class="w-20 h-20 bg-[#D0BCFF] rounded-full flex items-center justify-center mx-auto mb-6 voice-pulse">
-                <i data-lucide="mic" class="text-[#381E72] w-8 h-8"></i>
-            </div>
-            <p id="voice-timer" class="text-5xl font-bold mb-2 text-white tabular-nums">00:00</p>
-            <p class="text-gray-500 text-xs mb-10 uppercase tracking-[0.3em]">Recording Signal</p>
-            <button id="stop-voice-btn" class="w-full py-4 bg-white/5 border border-white/10 rounded-full font-bold hover:bg-red-500/20 hover:text-red-400 transition-all">
-                End Transmission
-            </button>
-        </div>
-    </div>
-
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
@@ -231,19 +303,83 @@
         const supabase = createClient(SB_URL, SB_KEY);
 
         let user = null;
-        let editId = null;
-        let recorder = null;
-        let audioChunks = [];
-        let timerInterval = null;
-        let notificationsEnabled = false;
-
-        // --- WEB RTC & VOICE CALLING STATE ---
         let peerConnection = null;
         let localStream = null;
         let callChannel = null;
-        const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-        // --- SESSION ---
+        /** * Updated WebRTC Config with TURN servers to bypass restrictive firewalls.
+         * Using OpenRelay public servers.
+         */
+        const rtcConfig = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                }
+            ],
+            iceCandidatePoolSize: 10
+        };
+
+        function runIntro() {
+            const progress = document.getElementById('intro-progress');
+            const loaderText = document.getElementById('terminal-loader');
+            const phrases = [
+                "> INITIALIZING SECURE LINK...",
+                "> DECRYPTING PACKETS...",
+                "> AUTHENTICATING HANDSHAKE...",
+                "> ACCESS GRANTED."
+            ];
+            
+            let p = 0;
+            let phraseIdx = 0;
+            const interval = setInterval(() => {
+                p += Math.random() * 5;
+                if (p > 100) p = 100;
+                progress.style.width = `${p}%`;
+                
+                if (p > (phraseIdx + 1) * 25 && phraseIdx < phrases.length - 1) {
+                    phraseIdx++;
+                    loaderText.innerText = phrases[phraseIdx];
+                }
+
+                if (p >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        const intro = document.getElementById('intro-screen');
+                        intro.style.transition = 'opacity 0.8s ease';
+                        intro.style.opacity = '0';
+                        setTimeout(() => {
+                            intro.remove();
+                            checkInitialState();
+                        }, 800);
+                    }, 500);
+                }
+            }, 50);
+        }
+
+        function checkInitialState() {
+            const savedUser = loadSession();
+            if (savedUser) { 
+                user = savedUser; 
+                enterApp(); 
+            } else {
+                document.getElementById('auth-overlay').style.display = 'flex';
+            }
+        }
+
         const saveSession = (userData) => localStorage.setItem('aether_session', JSON.stringify(userData));
         const loadSession = () => {
             const saved = localStorage.getItem('aether_session');
@@ -254,10 +390,9 @@
             location.reload();
         };
 
-        // --- UI HELPERS ---
         const scroll = () => {
             const c = document.getElementById('chat-container');
-            c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
+            if (c) c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
         };
         const updateIcons = () => lucide.createIcons();
         const showToast = (msg, isError = true) => {
@@ -272,19 +407,17 @@
             }, 4000);
         };
 
-        // --- VOICE CALLING LOGIC ---
         async function startCall() {
-            // Setup UI
             document.getElementById('call-overlay').classList.remove('hidden');
-            document.getElementById('call-status').innerText = "Ringing Global Room";
-            document.getElementById('call-user').innerText = "Encrypted Connection";
+            document.getElementById('call-status').innerText = "Ringing Terminal...";
+            document.getElementById('call-user').innerText = "Broadcasting Signal";
             document.getElementById('incoming-actions').classList.add('hidden');
             document.getElementById('end-call-btn').classList.remove('hidden');
             document.getElementById('ringtone').play();
 
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                peerConnection = new RTCPeerConnection(config);
+                peerConnection = new RTCPeerConnection(rtcConfig);
                 
                 localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
                 
@@ -295,42 +428,44 @@
                 };
 
                 peerConnection.onicecandidate = e => {
-                    if (e.candidate) callChannel.send({ type: 'broadcast', event: 'ice-candidate', payload: e.candidate });
+                    if (e.candidate) {
+                        callChannel.send({ type: 'broadcast', event: 'ice-candidate', payload: e.candidate });
+                    }
+                };
+
+                peerConnection.oniceconnectionstatechange = () => {
+                    if (peerConnection.iceConnectionState === 'failed') {
+                        showToast("Link unstable. Retrying...");
+                        peerConnection.restartIce();
+                    }
                 };
 
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
-                
-                callChannel.send({
-                    type: 'broadcast',
-                    event: 'call-offer',
-                    payload: { offer, from: user.username }
-                });
+                callChannel.send({ type: 'broadcast', event: 'call-offer', payload: { offer, from: user.username } });
 
             } catch (err) {
-                console.error(err);
+                console.error("Call start error:", err);
                 showToast("Hardware Error: Mic Unavailable");
                 endCall();
             }
         }
 
         async function handleOffer(payload) {
-            if (payload.from === user.username) return; // Ignore own offer
-            
+            if (payload.from === user.username) return; 
             document.getElementById('call-overlay').classList.remove('hidden');
             document.getElementById('call-status').innerText = "Incoming Signal";
             document.getElementById('call-user').innerText = payload.from;
             document.getElementById('incoming-actions').classList.remove('hidden');
             document.getElementById('end-call-btn').classList.add('hidden');
             document.getElementById('ringtone').play();
-
             window.pendingOffer = payload.offer;
         }
 
         async function answerCall() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                peerConnection = new RTCPeerConnection(config);
+                peerConnection = new RTCPeerConnection(rtcConfig);
                 
                 localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
                 
@@ -341,13 +476,14 @@
                 };
 
                 peerConnection.onicecandidate = e => {
-                    if (e.candidate) callChannel.send({ type: 'broadcast', event: 'ice-candidate', payload: e.candidate });
+                    if (e.candidate) {
+                        callChannel.send({ type: 'broadcast', event: 'ice-candidate', payload: e.candidate });
+                    }
                 };
 
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(window.pendingOffer));
                 const answer = await peerConnection.createAnswer();
                 await peerConnection.setLocalDescription(answer);
-                
                 callChannel.send({ type: 'broadcast', event: 'call-answer', payload: answer });
                 
                 document.getElementById('incoming-actions').classList.add('hidden');
@@ -355,6 +491,7 @@
                 document.getElementById('ringtone').pause();
 
             } catch (err) {
+                console.error("Answer error:", err);
                 showToast("Connection failed");
                 endCall();
             }
@@ -372,10 +509,11 @@
             document.getElementById('call-overlay').classList.add('hidden');
             document.getElementById('ringtone').pause();
             document.getElementById('ringtone').currentTime = 0;
-            callChannel.send({ type: 'broadcast', event: 'call-end', payload: {} });
+            if(callChannel) {
+                callChannel.send({ type: 'broadcast', event: 'call-end', payload: {} });
+            }
         }
 
-        // --- AUTH ---
         async function login() {
             const u = document.getElementById('login-user').value.trim();
             const p = document.getElementById('login-pass').value.trim();
@@ -397,34 +535,34 @@
         }
 
         function enterApp() {
-            document.getElementById('auth-overlay').classList.add('hidden');
+            document.getElementById('auth-overlay').style.display = 'none';
             document.getElementById('app-content').style.display = 'flex';
             document.getElementById('user-display').innerText = user.username.toUpperCase();
-            init();
+            initApp();
             setupSignaling();
         }
 
         function setupSignaling() {
-            callChannel = supabase.channel('voice_signaling', {
-                config: { broadcast: { self: false } }
-            });
-
+            callChannel = supabase.channel('voice_signaling', { config: { broadcast: { self: false } } });
             callChannel
                 .on('broadcast', { event: 'call-offer' }, ({ payload }) => handleOffer(payload))
                 .on('broadcast', { event: 'call-answer' }, async ({ payload }) => {
                     if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(payload));
                 })
                 .on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
-                    if (peerConnection) await peerConnection.addIceCandidate(new RTCIceCandidate(payload));
+                    if (peerConnection) {
+                        try {
+                            await peerConnection.addIceCandidate(new RTCIceCandidate(payload));
+                        } catch(e) { console.warn("ICE candidate error", e); }
+                    }
                 })
                 .on('broadcast', { event: 'call-end' }, () => {
-                    showToast("Partner disconnected");
+                    showToast("Partner disconnected", false);
                     endCall();
                 })
                 .subscribe();
         }
 
-        // --- MESSAGING UI ---
         function renderMessage(msg) {
             const isMe = msg.user_id === user.id;
             const time = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -444,7 +582,7 @@
                 </div>`;
         }
 
-        async function init() {
+        async function initApp() {
             const { data } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
             const chat = document.getElementById('chat-container');
             chat.innerHTML = (data || []).map(renderMessage).join('');
@@ -458,7 +596,6 @@
             }).subscribe();
         }
 
-        // --- EVENTS ---
         document.getElementById('login-btn').addEventListener('click', login);
         document.getElementById('start-call-btn').addEventListener('click', startCall);
         document.getElementById('answer-call').addEventListener('click', answerCall);
@@ -466,7 +603,6 @@
         document.getElementById('end-call-btn').addEventListener('click', endCall);
         document.getElementById('logout-btn').addEventListener('click', clearSession);
 
-        // Messaging logic
         document.getElementById('send-btn').addEventListener('click', async () => {
             const input = document.getElementById('msg-input');
             const txt = input.value.trim();
@@ -478,8 +614,7 @@
 
         document.getElementById('msg-input').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); document.getElementById('send-btn').click(); } };
 
-        const savedUser = loadSession();
-        if (savedUser) { user = savedUser; enterApp(); }
+        window.addEventListener('load', runIntro);
         updateIcons();
     </script>
 </body>
